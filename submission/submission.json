@@ -1,0 +1,18 @@
+[
+  {
+    "filename": "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/query/4597118805213184.jpg",
+    "gallery_images": [
+      "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/gallery/painting_085_000045.jpg",
+      "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/gallery/painting_085_000118.jpg",
+      "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/gallery/painting_085_000084.jpg"
+    ]
+  },
+  {
+    "filename": "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/query/n01855672_10973.jpg",
+    "gallery_images": [
+      "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/gallery/n01855672_1037.jpg",
+      "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/gallery/n01855672_4197.jpg",
+      "C:/Users/utente/Desktop/UNITN/Intro to ML/ML-project/Examples/test/gallery/n01855672_4393.jpg"
+    ]
+  }
+]
