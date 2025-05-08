@@ -1,18 +1,22 @@
 [
   {
-    "filename": "Examples/test/query/4597118805213184.jpg",
+    "filename": "Testing_images2/test/query/horse_query.jpg",
     "gallery_images": [
-      "Examples/test/gallery/painting_085_000045.jpg",
-      "Examples/test/gallery/painting_085_000118.jpg",
-      "Examples/test/gallery/painting_085_000084.jpg"
+      "Testing_images2/test/gallery/horse_gallery_3.jpg",
+      "Testing_images2/test/gallery/horse_gallery_2.jpg",
+      "Testing_images2/test/gallery/horse_gallery_0.jpg",
+      "Testing_images2/test/gallery/horse_gallery_4.jpg",
+      "Testing_images2/test/gallery/horse_gallery_1.jpg"
     ]
   },
   {
-    "filename": "Examples/test/query/n01855672_10973.jpg",
+    "filename": "Testing_images2/test/query/lion_query.jpg",
     "gallery_images": [
-      "Examples/test/gallery/n01855672_1037.jpg",
-      "Examples/test/gallery/n01855672_4197.jpg",
-      "Examples/test/gallery/n01855672_4393.jpg"
+      "Testing_images2/test/gallery/lion_gallery_0.jpg",
+      "Testing_images2/test/gallery/lion_gallery_4.jpg",
+      "Testing_images2/test/gallery/horse_gallery_2.jpg",
+      "Testing_images2/test/gallery/lion_gallery_2.jpg",
+      "Testing_images2/test/gallery/horse_gallery_1.jpg"
     ]
   }
 ]
