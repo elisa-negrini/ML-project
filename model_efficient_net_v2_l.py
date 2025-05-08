@@ -100,14 +100,14 @@ def save_submission(results, output_path):
 # MAIN PIPELINE
 if __name__ == "__main__":
     # Step 1: Fine-tuning sul training set
-    train_dataset = datasets.ImageFolder("testing_images1/training", transform=transform)
+    train_dataset = datasets.ImageFolder("testing_images4/training", transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     model = get_model(num_classes=len(train_dataset.classes))
     #model = train_model(model, train_loader, epochs=5)
 
     # Step 2: Estrai embedding da query e gallery
-    query_embeddings, query_files = extract_embeddings_from_folder("testing_images1/test/query", model)
-    gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images1/test/gallery", model)
+    query_embeddings, query_files = extract_embeddings_from_folder("testing_images4/test/query", model)
+    gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images4/test/gallery", model)
 
     # Step 3: Retrieval
     submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=30)
