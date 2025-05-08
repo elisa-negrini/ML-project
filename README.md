@@ -13,3 +13,8 @@ Your task:
 • For each image, retrieve the top k most similar images
 
 • Submit via API call to the testing server
+
+
+DOMANDE:
+
+k deve essere arbitrario deciso dal modello o è un parametro che decidiamo noi/voi?
