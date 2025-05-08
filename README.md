@@ -2,14 +2,9 @@
 
 Group members: Elisa Negrini, Michele Lovato Menin, Tommaso Ballarini
 
-You’ll be given:
+DUBBI 
 
-• A training set with a number of images and classes
-
-• A test set without annotations
-
-Your task:
-
-• For each image, retrieve the top k most similar images
-
-• Submit via API call to the testing server
+- quante immagini ci danno per il mini training là?
+- score di similarità conta solo se becchiamo tutte le anatre, o se becchiamo anche l’anatra più simile
+- ci danno il fine tuning per le immagini del test?
+- quanto grande la gallery
