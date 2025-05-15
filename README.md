@@ -14,3 +14,8 @@ Per Zio Pietro
 - Ha senso usare i top modelli e poi fare fine tuning sul nostro dominio o è ci sono altre strategie?
 - Usare git-hub, come non creare conflitti
 - Perchè usare la azure machine? o basta colab?
+
+Possibili problematiche:
+La funzione get_feature_extractor processa le immagini una alla volta. Questo può essere lento per gallery e query di grandi dimensioni.
+Suggerimento: Modifica get_feature_extractor per processare le immagini in batch.
+se abbiamo una gallery gigantesca ci mettiamo tabto a estrarre l'embedding per le immagini se le estraiamo una ad una
