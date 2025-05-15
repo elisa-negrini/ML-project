@@ -118,8 +118,8 @@ def save_submission(results, output_path):
 # ====== MAIN ======
 if __name__ == "__main__":
     print("let's start")
-    query_folder = "testing_images7_fish/test/query"
-    gallery_folder = "testing_images7_fish/test/gallery"
+    query_folder = "testing_images6_clothes/test/query"
+    gallery_folder = "testing_images6_clothes/test/gallery"
 
     query_files = sorted([os.path.join(query_folder, f) for f in os.listdir(query_folder) if f.lower().endswith((".jpg", ".jpeg", ".png"))])
     gallery_files = sorted([os.path.join(gallery_folder, f) for f in os.listdir(gallery_folder) if f.lower().endswith((".jpg", ".jpeg", ".png"))])
@@ -145,5 +145,5 @@ if __name__ == "__main__":
     submission = retrieve_combined(query_total, query_files, gallery_total, gallery_files, k=50)
 
     # Salvataggio
-    save_submission(submission, "submission/ensemble_CDER.json")
+    save_submission(submission, "submission/ensemble_CDER_t6.json")
     print("✅ Submission salvata in: submission/ensemble_submission.json")
