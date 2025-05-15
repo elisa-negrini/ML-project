@@ -1,7 +1,7 @@
 import json
 
 # 🔁 Modifica questo percorso con quello corretto del tuo file JSON
-json_path = "submission/submission_efficientnetv2_t4_50.json"
+json_path = "submission/submission_dino_t1.json"
 
 # Caricamento dei dati dal file JSON
 with open(json_path, "r") as f:
