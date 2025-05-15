@@ -138,14 +138,14 @@ transform = get_transform()
 #train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)  # Batch size ridotto per evitare OOM
 
 # Step 2: Fine-tune CLIP
-model = CLIPFineTuner(clip_model, embed_dim=512, num_classes=19)
+model = CLIPFineTuner(clip_model, embed_dim=512, num_classes=23)
 #model = train_model(model, train_loader, epochs=10, lr=1e-4)  # Aumentato numero di epoche
 
 # Step 3: Estrai features da query e gallery usando il modello fine-tuned
 extractor = get_feature_extractor(model)
 
-query_folder = "ML-project/testing_images6_clothes/query"
-gallery_folder = "ML-project/testing_images6_clothes/gallery"
+query_folder = "ML-project/testing_images7_fish/test/query"
+gallery_folder = "ML-project/testing_images7_fish/test/gallery"
 query_files = [os.path.join(query_folder, fname) for fname in os.listdir(query_folder) if fname.endswith(".jpg")]
 gallery_files = [os.path.join(gallery_folder, fname) for fname in os.listdir(gallery_folder) if fname.endswith(".jpg")]
 
@@ -153,9 +153,9 @@ query_embs = extractor(query_files)
 gallery_embs = extractor(gallery_files)
 
 # Step 4: Retrieval
-submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=20)
+submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=49)
 
 # Step 5: Salvataggio
-submission_path = "ML-project//submission/submission_clip_t6.json"
+submission_path = "ML-project//submission/submission_clip_t7.json"
 save_submission(submission, submission_path)
 print(f"✅ Submission salvata in: {submission_path}")
