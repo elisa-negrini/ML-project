@@ -92,52 +92,82 @@ def extract_resnet_embeddings(image_paths):
         embeddings.append(feats.cpu())
     return l2_normalize(torch.cat(embeddings, dim=0).numpy().astype("float32"))
 
-# ====== MEDIA DEGLI EMBEDDING CON PCA ======
-def mean_fuse_embeddings(*emb_lists, shared_pca=None):
-    # Calculate the minimum dimension possible for PCA
-    min_samples = min(emb.shape[0] for emb in emb_lists)
-    # Choose a reasonable n_components that doesn't exceed the number of samples
-    n_components = min(min_samples - 1, 64)  # Using min_samples - 1 to be safe
-    
-    reduced_embs = []
-    for emb in emb_lists:
-        # Only apply PCA if dimensions need to be reduced
-        if emb.shape[1] > n_components:
-            if shared_pca is not None:
-                # Use pre-fitted PCA
-                reduced = shared_pca.transform(emb)
-            else:
-                # Fit new PCA
-                pca = PCA(n_components=n_components, whiten=True, random_state=42)
-                reduced = pca.fit_transform(emb)
-                if shared_pca is None:
-                    shared_pca = pca
-        else:
-            # If original dimension is smaller, just use it as is
-            reduced = emb
-        reduced_embs.append(reduced)
-    
-    # Make sure all embeddings have the same dimension for stacking
-    min_dim = min(emb.shape[1] for emb in reduced_embs)
-    aligned_embs = [emb[:, :min_dim] for emb in reduced_embs]
-    
-    stacked = np.stack(aligned_embs, axis=0)
-    fused = np.mean(stacked, axis=0)
-    return l2_normalize(fused), shared_pca
-
 # ====== RETRIEVAL ======
-def retrieve_combined(query_embs, query_files, gallery_embs, gallery_files, k=50):
-    model = NearestNeighbors(n_neighbors=k, metric='cosine')
-    model.fit(gallery_embs)
-    distances, indices = model.kneighbors(query_embs)
+def compute_similarity_scores(query_embs, gallery_embs):
+    """Computes cosine similarity scores between query and gallery embeddings."""
+    # Normalizzazione L2 per garantire che le similarità coseno siano tra -1 e 1
+    query_norm = query_embs / np.linalg.norm(query_embs, axis=1, keepdims=True)
+    gallery_norm = gallery_embs / np.linalg.norm(gallery_embs, axis=1, keepdims=True)
+    
+    # Calcola similarità coseno: sim(a,b) = dot(a,b)/(|a|*|b|)
+    # Siccome abbiamo già normalizzato, possiamo semplicemente fare il prodotto scalare
+    similarity = np.dot(query_norm, gallery_norm.T)
+    
+    # Converte in scores tra 0 e 1 (da -1,1 a 0,1)
+    scores = (similarity + 1) / 2
+    
+    return scores
+
+def retrieve_with_ensemble(query_files, gallery_files, model_scores_list, model_names, k=50, high_confidence_threshold=0.975):
+    """
+    Retrieves gallery images for each query using an ensemble of models.
+    
+    Args:
+        query_files: Lista di file di query
+        gallery_files: Lista di file della gallery
+        model_scores_list: Lista di matrici di similarità [num_queries x num_gallery] per ogni modello
+        model_names: Lista di nomi dei modelli per il logging
+        k: Numero di immagini da recuperare per ogni query
+        high_confidence_threshold: Soglia di confidenza per considerare un modello come "molto sicuro"
+        
+    Returns:
+        Lista di risultati per ogni query
+    """
+    num_queries = len(query_files)
+    num_models = len(model_scores_list)
     results = []
-    for i, query_path in enumerate(query_files):
+    
+    for q_idx in range(num_queries):
+        query_path = query_files[q_idx]
         query_rel = query_path.replace("\\", "/")
-        gallery_matches = [gallery_files[idx].replace("\\", "/") for idx in indices[i]]
+        
+        # Estrai gli score di similarità per la query corrente da ogni modello
+        current_scores = [model_scores[q_idx] for model_scores in model_scores_list]
+        
+        # Identifica se c'è un modello con confidenza superiore al threshold
+        high_confidence_model = None
+        high_confidence_score = 0
+        high_confidence_indices = None
+        
+        for m_idx, scores in enumerate(current_scores):
+            max_score = np.max(scores)
+            if max_score > high_confidence_threshold:
+                # Se troviamo più modelli con alta confidenza, prendiamo quello con lo score più alto
+                if max_score > high_confidence_score:
+                    high_confidence_score = max_score
+                    high_confidence_model = m_idx
+                    # Get indices in order of decreasing similarity
+                    high_confidence_indices = np.argsort(scores)[::-1][:k]
+        
+        # Decidi se usare un singolo modello o la media
+        if high_confidence_model is not None:
+            print(f"Query {q_idx+1}/{num_queries}: Alta confidenza ({high_confidence_score:.4f}) dal modello {model_names[high_confidence_model]}")
+            top_indices = high_confidence_indices
+        else:
+            # Media degli score di similarità
+            avg_scores = np.mean(current_scores, axis=0)
+            # Get indices in order of decreasing similarity
+            top_indices = np.argsort(avg_scores)[::-1][:k]
+            print(f"Query {q_idx+1}/{num_queries}: Usando media dei modelli")
+        
+        # Recupera le immagini della gallery
+        gallery_matches = [gallery_files[idx].replace("\\", "/") for idx in top_indices]
+        
         results.append({
             "filename": query_rel,
             "gallery_images": gallery_matches
         })
+    
     return results
 
 def save_submission(results, output_path):
@@ -173,60 +203,21 @@ if __name__ == "__main__":
     print(f" - EfficientNet: {query_eff.shape}")
     print(f" - ResNet50    : {query_resnet.shape}")
 
-    # First create PCA transformers using all embeddings (query+gallery) to ensure consistent dimensions
-    print("🔧 Creating PCA transformers...")
+    print("📊 Calcolo degli score di similarità per ogni modello...")
     
-    # Combine query and gallery for PCA fitting
-    all_clip = np.vstack([query_clip, gallery_clip])
-    all_dino = np.vstack([query_dino, gallery_dino])
-    all_eff = np.vstack([query_eff, gallery_eff])
-    all_resnet = np.vstack([query_resnet, gallery_resnet])
+    # Calcola matrici di similarità per ogni modello
+    clip_scores = compute_similarity_scores(query_clip, gallery_clip)
+    dino_scores = compute_similarity_scores(query_dino, gallery_dino)
+    eff_scores = compute_similarity_scores(query_eff, gallery_eff)
+    resnet_scores = compute_similarity_scores(query_resnet, gallery_resnet)
     
-    # PCA component limit based on number of samples and features
-    min_samples = min(all_clip.shape[0], all_dino.shape[0], all_eff.shape[0], all_resnet.shape[0])
-    n_components = min(min_samples - 1, 64)
+    # Lista di tutte le matrici di score e nomi modelli
+    all_model_scores = [clip_scores, dino_scores, eff_scores, resnet_scores]
+    model_names = ["CLIP", "DINOv2", "EfficientNetV2", "ResNet50"]
     
-    # Fit PCA on combined data
-    pca_clip = PCA(n_components=n_components, whiten=True, random_state=42)
-    pca_dino = PCA(n_components=n_components, whiten=True, random_state=42)
-    pca_eff = PCA(n_components=n_components, whiten=True, random_state=42)
-    pca_resnet = PCA(n_components=n_components, whiten=True, random_state=42)
-    
-    pca_clip.fit(all_clip)
-    pca_dino.fit(all_dino)
-    pca_eff.fit(all_eff)
-    pca_resnet.fit(all_resnet)
-    
-    # Transform data with fitted PCAs
-    query_clip_reduced = pca_clip.transform(query_clip)
-    gallery_clip_reduced = pca_clip.transform(gallery_clip)
-    
-    query_dino_reduced = pca_dino.transform(query_dino)
-    gallery_dino_reduced = pca_dino.transform(gallery_dino)
-    
-    query_eff_reduced = pca_eff.transform(query_eff)
-    gallery_eff_reduced = pca_eff.transform(gallery_eff)
-    
-    query_resnet_reduced = pca_resnet.transform(query_resnet)
-    gallery_resnet_reduced = pca_resnet.transform(gallery_resnet)
-    
-    # Stack and average
-    query_stacked = np.stack([query_clip_reduced, query_dino_reduced, query_eff_reduced, query_resnet_reduced], axis=0)
-    gallery_stacked = np.stack([gallery_clip_reduced, gallery_dino_reduced, gallery_eff_reduced, gallery_resnet_reduced], axis=0)
-    
-    query_fused = np.mean(query_stacked, axis=0)
-    gallery_fused = np.mean(gallery_stacked, axis=0)
-    
-    # L2 normalize
-    query_fused = l2_normalize(query_fused)
-    gallery_fused = l2_normalize(gallery_fused)
-    
-    print(f"Shape fused embeddings:")
-    print(f" - Query: {query_fused.shape}")
-    print(f" - Gallery: {gallery_fused.shape}")
+    print("📥 Retrieval in corso con regola di confidenza...")
+    # Alta confidenza se >0.95 (convertito da cosine similarity che va da 0 a 1)
+    submission = retrieve_with_ensemble(query_files, gallery_files, all_model_scores, model_names, k=50, high_confidence_threshold=0.95)
 
-    print("📥 Retrieval in corso...")
-    submission = retrieve_combined(query_fused, query_files, gallery_fused, gallery_files, k=50)
-
-    save_submission(submission, "submission/ensemble_corrected.json")
+    save_submission(submission, "submission/ensemble_confidence_based.json")
     print("✅ Submission salvata.")
