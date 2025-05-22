@@ -44,7 +44,7 @@ transform_resnet = transforms.Compose([
     transforms.CenterCrop(224),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
+                             std=[0.229, 0.224, 0.225])
 ])
 
 # --- ConvNeXt ---
@@ -128,16 +128,11 @@ def l2_normalize(x):
     norm[norm == 0] = 1e-10 # Sostituisce norma zero con un valore piccolo
     return x / norm
 
-
 def extract_clip_embeddings(image_paths):
-    # init_clip_model() # Assicurato dalla logica main
     all_embeddings_list = []
     for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="CLIP"):
         batch_paths = image_paths[i:i+BATCH_SIZE]
         batch_images = [Image.open(path).convert("RGB") for path in batch_paths]
-        # Il processore CLIP può gestire una lista di immagini PIL
-        # padding=True è importante per gestire batch di immagini che potrebbero avere leggere variazioni post-trasformazione
-        # o se le trasformazioni interne del processore lo richiedono.
         inputs = clip_processor(images=batch_images, return_tensors="pt", padding=True, truncation=True).to(device)
         with torch.no_grad():
             emb_batch = clip_model.get_image_features(**inputs)
@@ -147,16 +142,13 @@ def extract_clip_embeddings(image_paths):
     return l2_normalize(concatenated_embeddings.numpy().astype("float32"))
 
 def extract_dino_embeddings(image_paths):
-    # init_dino_model() # Assicurato dalla logica main
     all_embeddings_list = []
     for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="DINOv2"):
         batch_paths = image_paths[i:i+BATCH_SIZE]
         batch_images = [Image.open(path).convert("RGB") for path in batch_paths]
-        # Il processore DINOv2 (AutoImageProcessor) può gestire una lista di immagini PIL
         inputs = dino_processor(images=batch_images, return_tensors="pt").to(device)
         with torch.no_grad():
             outputs = dino_model(**inputs)
-            # Estrai il CLS token embedding per ogni immagine nel batch
             emb_batch = outputs.last_hidden_state[:, 0, :]
         all_embeddings_list.append(emb_batch.cpu())
         
@@ -164,7 +156,6 @@ def extract_dino_embeddings(image_paths):
     return l2_normalize(concatenated_embeddings.numpy().astype("float32"))
 
 def extract_efficientnet_embeddings(image_paths):
-    # init_efficientnet_model()
     embeddings = []
     for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="EfficientNetV2"):
         batch_paths = image_paths[i:i+BATCH_SIZE]
@@ -178,7 +169,6 @@ def extract_efficientnet_embeddings(image_paths):
     return l2_normalize(torch.cat(embeddings, dim=0).numpy().astype("float32"))
 
 def extract_resnet_embeddings(image_paths):
-    # init_resnet_model()
     feature_extractor = torch.nn.Sequential(*list(resnet_model.children())[:-1])
     embeddings = []
     for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="ResNet50"):
@@ -192,7 +182,6 @@ def extract_resnet_embeddings(image_paths):
     return l2_normalize(torch.cat(embeddings, dim=0).numpy().astype("float32"))
 
 def extract_convnext_embeddings(image_paths):
-    # init_convnext_model()
     feature_extractor_convnext = torch.nn.Sequential(convnext_model.features, convnext_model.avgpool)
     embeddings = []
     for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="ConvNeXt"):
@@ -206,7 +195,6 @@ def extract_convnext_embeddings(image_paths):
     return l2_normalize(torch.cat(embeddings, dim=0).numpy().astype("float32"))
 
 def extract_vit_embeddings(image_paths):
-    # init_vit_model()
     embeddings = []
     for i in tqdm(range(0, len(image_paths), BATCH_SIZE), desc="ViT"):
         batch_paths = image_paths[i:i+BATCH_SIZE]
@@ -230,21 +218,31 @@ MODEL_EXTRACTORS = {
 # ====== RETRIEVAL ======
 def compute_similarity_scores(query_embs, gallery_embs):
     similarity = np.dot(query_embs, gallery_embs.T)
-    scores = (similarity + 1) / 2
+    scores = (similarity + 1) / 2 # Normalizza tra 0 e 1
     return scores
 
-def retrieve_with_weighted_ensemble(query_files, gallery_files, model_scores_list, model_accuracies, model_names, k=50):
+def retrieve_with_inverse_error_weighted_ensemble(query_files, gallery_files, model_scores_list, model_accuracies, model_names, k=50):
     num_queries = len(query_files)
     results = []
     
-    accuracies_array = np.array(model_accuracies)
-    if sum(accuracies_array) == 0:
+    accuracies_array = np.array(model_accuracies) / 100.0 # Converti a proporzione (es. 94.0 -> 0.94)
+    errors_array = 1.0 - accuracies_array # Tasso di errore
+    
+    # Calcola i pesi inversi. Aggiungi un piccolo valore per evitare divisione per zero
+    # o pesi eccessivamente grandi per accuratezze quasi perfette.
+    epsilon = 1e-6 # Piccolo valore per stabilità numerica
+    weights_raw = 1.0 / (errors_array + epsilon)
+    
+    # Normalizza i pesi in modo che sommino a 1
+    # Se tutte le accuratezze sono identiche (e quindi tutti gli errori), i pesi raw saranno uguali.
+    # In quel caso, la normalizzazione li renderà uniformi.
+    if np.all(accuracies_array == accuracies_array[0]): 
         weights = np.ones(len(model_accuracies)) / len(model_accuracies)
-        print("Attenzione: tutte le accuratezze fornite sono 0. Si utilizzano pesi uguali.")
+        print("Attenzione: tutte le accuratezze fornite sono uguali. Si utilizzano pesi uniformi.")
     else:
-        weights = accuracies_array / sum(accuracies_array)
+        weights = weights_raw / np.sum(weights_raw)
 
-    print(f"Pesi dei modelli per la media ponderata (basati su {len(model_names)} modelli selezionati):")
+    print(f"Pesi dei modelli per la media ponderata (inverso dell'errore, basati su {len(model_names)} modelli selezionati):")
     for name, weight, accuracy in zip(model_names, weights, model_accuracies):
         print(f" - {name}: {weight:.4f} (accuratezza fornita: {accuracy:.2f}%)")
     
@@ -275,8 +273,8 @@ def save_submission(results, output_path):
 
 # ====== MAIN ======
 if __name__ == "__main__":
-    query_folder = "testing_images7_fish/test/query" # Modifica se necessario
-    gallery_folder = "testing_images7_fish/test/gallery" # Modifica se necessario
+    query_folder = "testing_images6_clothes/test/query" # Modifica se necessario
+    gallery_folder = "testing_images6_clothes/test/gallery" # Modifica se necessario
 
     # ====== CONFIGURAZIONE MODELLI DA UTILIZZARE ======
     # Specifica qui quali modelli vuoi includere. I nomi devono corrispondere alle chiavi in MODEL_INITIALIZERS e MODEL_EXTRACTORS.
@@ -284,18 +282,17 @@ if __name__ == "__main__":
     # ENABLED_MODELS = ["CLIP", "DINOv2"]
     # ENABLED_MODELS = ["ResNet50", "EfficientNetV2", "ConvNeXt", "ViT"]
     # ENABLED_MODELS = ["CLIP", "DINOv2", "EfficientNetV2", "ResNet50", "ConvNeXt", "ViT"] # Tutti i modelli
-    ENABLED_MODELS = ["DINOv2", "ViT"]
+    ENABLED_MODELS = ["CLIP", "DINOv2", "EfficientNetV2", "ResNet50", "ConvNeXt", "ViT"] # Esempio con i tuoi modelli preferiti
 
     # Accuratezze di default (come percentuali, es. 94.0 per 94%)
-    # Queste verranno usate per i modelli in ENABLED_MODELS.
-    # Puoi aggiornarle qui se hai stime più recenti.
+    # Aggiorna questi valori con le accuratezze REALI che hai misurato sul tuo dataset!
     MODEL_DEFAULT_ACCURACIES = {
-        "CLIP": 79.51,
-        "DINOv2": 95.92,
-        "EfficientNetV2": 90.48,
-        "ResNet50": 74.96,
-        "ConvNeXt": 84.96, # Esempio, da aggiornare con valore reale
-        "ViT": 92.96,     # Esempio, da aggiornare con valore reale
+        "CLIP": 56.71,
+        "DINOv2": 43.16,
+        "EfficientNetV2": 54.42,
+        "ResNet50": 54.32,
+        "ConvNeXt": 50.42,
+        "ViT": 62.32,
     }
 
     for model_name in ENABLED_MODELS:
@@ -353,9 +350,9 @@ if __name__ == "__main__":
         print("Nessuno score calcolato. Impossibile procedere con il retrieval.")
         exit()
 
-    print("\n📥 Retrieval in corso con media ponderata basata su accuratezze fornite...")
+    print("\n📥 Retrieval in corso con media ponderata basata sull'inverso delle accuratezze...")
     
-    submission = retrieve_with_weighted_ensemble(
+    submission = retrieve_with_inverse_error_weighted_ensemble(
         query_files, 
         gallery_files, 
         active_model_scores, 
@@ -364,6 +361,6 @@ if __name__ == "__main__":
         k=50
     )
 
-    output_filename = "submission/ensemble_manual_accuracies_t7_2.json" # Aggiornato nome file per chiarezza
+    output_filename = "submission/ensemble_inverse_accuracies_t6.json" # Nome file aggiornato
     save_submission(submission, output_filename)
     print(f"✅ Submission salvata in: {output_filename}")
