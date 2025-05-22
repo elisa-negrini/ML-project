@@ -128,6 +128,15 @@ def save_submission(results, output_path):
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
 
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
+
+
 # ===============================
 # ESECUZIONE COMPLETA
 # ===============================
@@ -154,8 +163,15 @@ gallery_embs = extractor(gallery_files)
 
 # Step 4: Retrieval
 submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=49)
-
+data = {
+    os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+    for entry in submission
+}
 # Step 5: Salvataggio
-submission_path = "submission/submission_clip_ft_t1.json"
-save_submission(submission, submission_path)
+submission_path = "submission/submission_clip_ft_t1.py"
+save_submission_d(data, submission_path)
+
+# if you want json
+# submission_path = "submission/submission_clip_ft_t1.json"
+# save_submission(submission, submission_path)
 print(f"✅ Submission salvata in: {submission_path}")
