@@ -269,8 +269,8 @@ def save_submission(results, output_path):
 
 # ====== MAIN ======
 if __name__ == "__main__":
-    query_folder = "testing_images6_clothes/test/query" # Modifica se necessario
-    gallery_folder = "testing_images6_clothes/test/gallery" # Modifica se necessario
+    query_folder = "testing_images7_fish/test/query" # Modifica se necessario
+    gallery_folder = "testing_images7_fish/test/gallery" # Modifica se necessario
 
     # ====== CONFIGURAZIONE MODELLI DA UTILIZZARE ======
     # Specifica qui quali modelli vuoi includere. I nomi devono corrispondere alle chiavi in MODEL_INITIALIZERS e MODEL_EXTRACTORS.
@@ -278,18 +278,18 @@ if __name__ == "__main__":
     # ENABLED_MODELS = ["CLIP", "DINOv2"]
     # ENABLED_MODELS = ["ResNet50", "EfficientNetV2", "ConvNeXt", "ViT"]
     # ENABLED_MODELS = ["CLIP", "DINOv2", "EfficientNetV2", "ResNet50", "ConvNeXt", "ViT"] # Tutti i modelli
-    ENABLED_MODELS = ["CLIP", "ViT", "ConvNeXt"] # Esempio: solo alcuni modelli
+    ENABLED_MODELS = ["CLIP", "DINOv2", "EfficientNetV2", "ResNet50", "ConvNeXt", "ViT"]
 
     # Accuratezze di default (come percentuali, es. 94.0 per 94%)
     # Queste verranno usate per i modelli in ENABLED_MODELS.
     # Puoi aggiornarle qui se hai stime più recenti.
     MODEL_DEFAULT_ACCURACIES = {
-        "CLIP": 56.71,
-        "DINOv2": 43.16,
-        "EfficientNetV2": 54.42,
-        "ResNet50": 50.00,
-        "ConvNeXt": 52.50, # Esempio, da aggiornare con valore reale
-        "ViT": 55.20,     # Esempio, da aggiornare con valore reale
+        "CLIP": 79.51,
+        "DINOv2": 95.92,
+        "EfficientNetV2": 90.48,
+        "ResNet50": 74.96,
+        "ConvNeXt": 84.96, # Esempio, da aggiornare con valore reale
+        "ViT": 92.96,     # Esempio, da aggiornare con valore reale
     }
     # =====================================================
 
