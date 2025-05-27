@@ -99,18 +99,18 @@ def extract_embeddings_from_folder(folder_path, model):
     return torch.cat(all_embeddings, dim=0).numpy(), filenames
 
 # Step 1: Fine-tune il modello sul training set
-train_dataset = datasets.ImageFolder("testing_images5/training", transform=transform)
+train_dataset = datasets.ImageFolder("testing_images8_animals/training", transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 model = get_model(num_classes=len(train_dataset.classes))
 model = train_model(model, train_loader, epochs=5)
 
 # Step 2: Estrai features da query e gallery
 feature_extractor = get_feature_extractor(model)
-query_embeddings, query_files = extract_embeddings_from_folder("testing_images5/test/query", feature_extractor)
-gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images5/test/gallery", feature_extractor)
+query_embeddings, query_files = extract_embeddings_from_folder("testing_images8_animals/test/query", feature_extractor)
+gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images8_animals/test/gallery", feature_extractor)
 
 # Step 3: Retrieval
-submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=50) # <- CAMBIARE QUESTO K 
+submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIARE QUESTO K 
 
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]

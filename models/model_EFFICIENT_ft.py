@@ -11,6 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 torch.backends.cudnn.benchmark = True  # ottimizzazione CUDA
 
 transform = transforms.Compose([
@@ -109,21 +110,21 @@ def save_submission_d(results, output_path):
 
 if __name__ == "__main__":
     # riduco batch size per limitare uso memoria
-    train_dataset = datasets.ImageFolder("testing_images5/training", transform=transform)
+    train_dataset = datasets.ImageFolder("testing_images8_animals/training", transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=4, pin_memory=True)  
 
     model = get_model(num_classes=len(train_dataset.classes))
     model = train_model(model, train_loader, epochs=5)
 
-    query_embeddings, query_files = extract_embeddings_from_folder("testing_images5/test/query", model)
-    gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images5/test/gallery", model)
+    query_embeddings, query_files = extract_embeddings_from_folder("testing_images8_animals/test/query", model)
+    gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images8_animals/test/gallery", model)
 
-    submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=50) # <- MODIFICARE DA QUA IL K
+    submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- MODIFICARE DA QUA IL K
     data = {
         os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
         for entry in submission
     }
-    submission_path = "submission/submission_efficient_ft_t5.json"
+    submission_path = "submission/submission_efficient_ft_t8.py"
     save_submission_d(data, submission_path)
 
     

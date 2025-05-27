@@ -13,6 +13,7 @@ import faiss
 
 # === CONFIGURAZIONE ===
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
 MODEL_NAME = "google/vit-base-patch16-224"
 
 # === CARICAMENTO MODELLO E PROCESSOR ===
@@ -54,7 +55,7 @@ def custom_collate(batch):
     return tensors, labels
 
 # === FUNZIONE DI TRAINING ===
-def train_model(model, dataloader, image_processor_func, epochs=5, lr=5e-5):
+def train_model(model, dataloader, image_processor_func, epochs=10, lr=5e-5):
     model = model.to(device)
     model.train()
     criterion = nn.CrossEntropyLoss()
@@ -134,7 +135,7 @@ def save_submission(results, output_path):
         json.dump(results, f, indent=2)
 
 # === ESECUZIONE ===
-train_dataset = datasets.ImageFolder("testing_images4/training")
+train_dataset = datasets.ImageFolder("testing_images8_animals/training")
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=custom_collate)
 num_classes = len(train_dataset.classes)
 print(f"Trovate {num_classes} classi: {train_dataset.classes}")
@@ -144,12 +145,12 @@ model_to_train = ImageClassifierFineTuner(vit_model, embed_dim=embed_dim, num_cl
 trained_model = train_model(model_to_train, train_loader, image_processor, epochs=10, lr=1e-5)
 
 feature_extractor_fn = get_feature_extractor(trained_model, image_processor)
-query_files = [os.path.join("testing_images4/test/query", f) for f in os.listdir("testing_images4/test/query") if f.lower().endswith((".jpg", ".jpeg", ".png"))]
-gallery_files = [os.path.join("testing_images4/test/gallery", f) for f in os.listdir("testing_images4/test/gallery") if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+query_files = [os.path.join("testing_images8_animals/test/query", f) for f in os.listdir("testing_images8_animals/test/query") if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+gallery_files = [os.path.join("testing_images8_animals/test/gallery", f) for f in os.listdir("testing_images8_animals/test/gallery") if f.lower().endswith((".jpg", ".jpeg", ".png"))]
 
 query_embs = feature_extractor_fn(query_files)
 gallery_embs = feature_extractor_fn(gallery_files)
 
-submission = retrieve_query_vs_gallery_faiss(query_embs, query_files, gallery_embs, gallery_files, k=50)
-save_submission(submission, "submission/submission_vit_ft_faiss_t4.json")
+submission = retrieve_query_vs_gallery_faiss(query_embs, query_files, gallery_embs, gallery_files, k=10)
+save_submission(submission, "submission/submission_vit_ft_faiss_t8_10e.json")
 print("✅ Submission salvata.")
