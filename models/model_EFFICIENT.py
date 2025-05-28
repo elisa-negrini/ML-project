@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 # Dispositivo
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 # Transform coerente con EfficientNetV2
 transform = transforms.Compose([
@@ -53,7 +54,7 @@ def extract_embeddings_from_folder(folder_path, model):
     return torch.cat(all_embeddings, dim=0).numpy(), filenames
 
 # 3. Retrieval top-k tra query e gallery
-def retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=5):
+def retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10):
     nn_model = NearestNeighbors(n_neighbors=k, metric='cosine')
     nn_model.fit(gallery_embs)
     distances, indices = nn_model.kneighbors(query_embs)
@@ -90,12 +91,15 @@ if __name__ == "__main__":
     query_embeddings, query_files = extract_embeddings_from_folder("testing_images7_fish/test/query", model)
     gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images7_fish/test/gallery", model)
 
-    submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=50) # <- CAMBIA QUESTO K
+    submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIA QUESTO K
 
     data = {
         os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-        for entry in submission
+        for entry in submission_list
     }
+
+    # submission(data, "Pretty Figure")
+
     submission_path = "submission/submission_efficient_t7.py"
     save_submission_d(data, submission_path)
 

@@ -2,7 +2,7 @@ import importlib.util
 import os
 
 # ✅ Percorso al file Python con il dizionario dei risultati
-submission_file = "submission/submission_vit_faiss_t7.py"
+submission_file = "submission/submission_resnet50_ft_t5.py"
 
 # ✅ Carica dinamicamente il modulo dal file Python
 spec = importlib.util.spec_from_file_location("submission_results", submission_file)

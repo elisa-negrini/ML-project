@@ -10,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 transform = transforms.Compose([
     transforms.Resize(256),
@@ -80,12 +81,15 @@ feature_extractor = get_feature_extractor()
 query_embeddings, query_files = extract_embeddings_from_folder("testing_images6_clothes/test/query", feature_extractor)
 gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images6_clothes/test/gallery", feature_extractor)
 
-submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=50) # <- CAMBIA QUESTO K
+submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIA QUESTO K
 
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-    for entry in submission
+    for entry in submission_list
 }
+
+# submission(data, "Pretty Figure")
+
 submission_path = "submission/submission_resnet50_t6.py"
 save_submission_d(data, submission_path)
 

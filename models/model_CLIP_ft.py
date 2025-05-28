@@ -11,7 +11,7 @@ import os
 from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print(device)
 # Carica CLIP
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -76,7 +76,9 @@ def train_model(model, dataloader, epochs=5, lr=5e-5):
 
             optimizer.zero_grad()
             outputs = model(inputs.pixel_values)
+
             loss = criterion(outputs, labels)
+
             loss.backward()
             optimizer.step()
             scheduler.step()
@@ -136,25 +138,25 @@ def save_submission_d(results, output_path):
             f.write(f'    "{key}": {value},\n')
         f.write("}\n")
 
-
 # ===============================
 # ESECUZIONE COMPLETA
 # ===============================
 
 # Step 1: Prepara il dataset con le trasformazioni corrette
 transform = get_transform()
-train_dataset = datasets.ImageFolder("testing_images1/training", transform=transform)
+train_dataset = datasets.ImageFolder("testing_images8_animals/training", transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)  # Batch size ridotto per evitare OOM
 
 # Step 2: Fine-tune CLIP
-model = CLIPFineTuner(clip_model, embed_dim=512, num_classes=23)
-model = train_model(model, train_loader, epochs=10, lr=1e-4)  # Aumentato numero di epoche
+num_classes = len(train_dataset.classes)
+model = CLIPFineTuner(clip_model, embed_dim=512, num_classes=num_classes)
+model = train_model(model, train_loader, epochs=5, lr=1e-4)  # Aumentato numero di epoche
 
 # Step 3: Estrai features da query e gallery usando il modello fine-tuned
 extractor = get_feature_extractor(model)
 
-query_folder = "testing_images1/test/query"
-gallery_folder = "testing_images1/test/gallery"
+query_folder = "testing_images8_animals/test/query"
+gallery_folder = "testing_images8_animals/test/gallery"
 query_files = [os.path.join(query_folder, fname) for fname in os.listdir(query_folder) if fname.endswith(".jpg")]
 gallery_files = [os.path.join(gallery_folder, fname) for fname in os.listdir(gallery_folder) if fname.endswith(".jpg")]
 
@@ -162,16 +164,21 @@ query_embs = extractor(query_files)
 gallery_embs = extractor(gallery_files)
 
 # Step 4: Retrieval
-submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=49)
+submission_list = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10) # <- CAMBIARE QUESTO K
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-    for entry in submission
+    for entry in submission_list
 }
+
+# print(data)
+# submission(data, "Pretty Figure")
+
 # Step 5: Salvataggio
-submission_path = "submission/submission_clip_ft_t1.py"
+submission_path = "submission/submission_clip_ft_t8_5e_new.py"
 save_submission_d(data, submission_path)
 
 # if you want json
 # submission_path = "submission/submission_clip_ft_t1.json"
 # save_submission(submission, submission_path)
+
 print(f"✅ Submission salvata in: {submission_path}")

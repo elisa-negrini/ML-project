@@ -271,6 +271,14 @@ def save_submission(results, output_path):
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
 
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
+
 # ====== MAIN ======
 if __name__ == "__main__":
     query_folder = "testing_images6_clothes/test/query" # Modifica se necessario
@@ -352,15 +360,25 @@ if __name__ == "__main__":
 
     print("\n📥 Retrieval in corso con media ponderata basata sull'inverso delle accuratezze...")
     
-    submission = retrieve_with_inverse_error_weighted_ensemble(
+    submission_list = retrieve_with_inverse_error_weighted_ensemble(
         query_files, 
         gallery_files, 
         active_model_scores, 
         active_model_accuracies_for_ensemble,
         active_model_names_for_ensemble, 
-        k=50
+        k=10
     )
 
-    output_filename = "submission/ensemble_inverse_accuracies_t6.json" # Nome file aggiornato
-    save_submission(submission, output_filename)
-    print(f"✅ Submission salvata in: {output_filename}")
+    data = {
+        os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+        for entry in submission_list
+    }
+
+    # print(data)
+    # submission(data, "Pretty Figure")
+
+    # Step 5: Salvataggio
+    submission_path = "submission/submission_minestrone_meanchoice.py"
+    save_submission_d(data, submission_path)
+
+    print(f"✅ Submission salvata in: {submission_path}")

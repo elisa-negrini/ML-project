@@ -22,6 +22,18 @@ se abbiamo una gallery gigantesca ci mettiamo tabto a estrarre l'embedding per l
 
 
 RESULTS:
+- modello vit_ft.py           ----- t8 ---- 82.22% -- k = 10 -- epochs = 10
+- modello vit_ft.py           ----- t8 ---- 81.46% -- k = 10 -- epochs = 5 -- 1min30/epoch
+- modello vit.py              ----- t8 ---- 81.30% -- k = 10
+- modello clip_ft.py          ----- t8 ---- 81.10% -- k = 10 -- epochs = 10-- 1min/epoch
+- modello efficient_ft.py     ----- t8 ---- 80.59% -- k = 10 -- epochs = 5 -- 50sec/epoch
+- modello clip_ft.py          ----- t8 ---- 79.75% -- k = 10 -- epochs = 5
+- modello dino.py             ----- t8 ---- 79.63% -- k = 10 
+- modello dino_ft.py          ----- t8 ---- 76.78% -- k = 10 -- epochs = 5
+- modello resnet_ft.py        ----- t8 ---- 76.09% -- k = 10 -- epochs = 5 -- 50sec/epoch
+- modello clip.py             ----- t8 ---- 57.49% -- k = 10 
+- modello resnet.py           ----- t8 ---- 57.30% -- k = 10 
+
 - modello_dino.py             ----- t7 ---- 95.92% -- k = 50
 - modello_minestrone_ CDER.py ----- t7 ---- 94.48% -- k = 50
 - model_vit.py                ----- t7 ---- 92.96% -- k = 50
