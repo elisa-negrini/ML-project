@@ -66,8 +66,8 @@ def save_submission_d(results, output_path):
 # ===============================
 # ESECUZIONE
 # ===============================
-query_folder = "testing_images6_clothes/test/query"
-gallery_folder = "testing_images6_clothes/test/gallery"
+query_folder = "testing_images5/test/query"
+gallery_folder = "testing_images5/test/gallery"
 
 query_files = [os.path.join(query_folder, f) for f in os.listdir(query_folder) if f.endswith(".jpg")]
 gallery_files = [os.path.join(gallery_folder, f) for f in os.listdir(gallery_folder) if f.endswith(".jpg")]
@@ -75,14 +75,16 @@ gallery_files = [os.path.join(gallery_folder, f) for f in os.listdir(gallery_fol
 query_embs = extract_features(query_files)
 gallery_embs = extract_features(gallery_files)
 
-submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=50)
+submission_list = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10)
 
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-    for entry in submission
+    for entry in submission_list
 }
-submission_path = "submission/submission_resnet50_t7.py"
+print(data)
+submission_path = "submission/submission_convnext_t6.py"
 save_submission_d(data, submission_path)
+#submission(data, "Pretty Figure")
 
 # if you want json
 # submission_path = "submission/submission_convnext_t6.json"

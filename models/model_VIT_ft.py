@@ -133,6 +133,15 @@ def save_submission(results, output_path):
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
 
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
+#inserire qua def submission
+
 # === ESECUZIONE ===
 train_dataset = datasets.ImageFolder("testing_images4/training")
 train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=custom_collate)
@@ -150,6 +159,15 @@ gallery_files = [os.path.join("testing_images4/test/gallery", f) for f in os.lis
 query_embs = feature_extractor_fn(query_files)
 gallery_embs = feature_extractor_fn(gallery_files)
 
-submission = retrieve_query_vs_gallery_faiss(query_embs, query_files, gallery_embs, gallery_files, k=50)
-save_submission(submission, "submission/submission_vit_ft_faiss_t4.json")
-print("✅ Submission salvata.")
+submission_list = retrieve_query_vs_gallery_faiss(query_embs, query_files, gallery_embs, gallery_files, k=10)
+data = {
+        os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+        for entry in submission_list
+    }
+
+submission_path = "submission/submission_vit_faiss_t4.py"
+save_submission_d(data, submission_path)
+
+#submission(data, "Pretty Figure")
+print(f"✅ Submission salvata in: {submission_path}")
+
