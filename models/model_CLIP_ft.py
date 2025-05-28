@@ -138,7 +138,6 @@ def save_submission_d(results, output_path):
             f.write(f'    "{key}": {value},\n')
         f.write("}\n")
 
-
 # ===============================
 # ESECUZIONE COMPLETA
 # ===============================
@@ -165,16 +164,21 @@ query_embs = extractor(query_files)
 gallery_embs = extractor(gallery_files)
 
 # Step 4: Retrieval
-submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10)
+submission_list = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10) # <- CAMBIARE QUESTO K
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-    for entry in submission
+    for entry in submission_list
 }
+
+# print(data)
+# submission(data, "Pretty Figure")
+
 # Step 5: Salvataggio
-submission_path = "submission/submission_clip_ft_t8_5e.py"
+submission_path = "submission/submission_clip_ft_t8_5e_new.py"
 save_submission_d(data, submission_path)
 
 # if you want json
 # submission_path = "submission/submission_clip_ft_t1.json"
 # save_submission(submission, submission_path)
+
 print(f"✅ Submission salvata in: {submission_path}")
