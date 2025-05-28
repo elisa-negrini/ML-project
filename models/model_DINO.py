@@ -9,6 +9,7 @@ import os
 from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
 
 MODEL_NAME = "facebook/dinov2-base"
 try:
@@ -94,11 +95,16 @@ gallery_embs = feature_extractor_fn(gallery_files)
 
 # === RETRIEVAL E SALVATAGGIO ===
 if query_embs.shape[0] > 0 and gallery_embs.shape[0] > 0:
-    submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=50) # <- CAMBIARE QUESTO K
+    submission_list = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10) # <- CAMBIARE QUESTO K
     data = {
         os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-        for entry in submission
+        for entry in submission_list
     }
+    
+    
+    # submission(data, "Pretty Figure")
+
+
     submission_path = "submission/submission_dino_t7.py"
     save_submission_d(data, submission_path)
 
