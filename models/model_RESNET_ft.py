@@ -10,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 transform = transforms.Compose([
     transforms.Resize(256),
@@ -48,7 +49,7 @@ def get_feature_extractor(trained_model):
     feature_extractor.eval()
     return feature_extractor.to(device)
 
-def retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=5):
+def retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10):
     model = NearestNeighbors(n_neighbors=k, metric='cosine')
     model.fit(gallery_embs)
     distances, indices = model.kneighbors(query_embs)
@@ -110,12 +111,15 @@ query_embeddings, query_files = extract_embeddings_from_folder("testing_images8_
 gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images8_animals/test/gallery", feature_extractor)
 
 # Step 3: Retrieval
-submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIARE QUESTO K 
+submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIARE QUESTO K 
 
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-    for entry in submission
+    for entry in submission_list
 }
+
+# submission(data, "Pretty Figure")
+
 # Step 4: Salvataggio nella repo
 submission_path = "submission/submission_resnet50_ft_t5.py"
 
