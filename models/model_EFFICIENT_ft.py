@@ -119,11 +119,15 @@ if __name__ == "__main__":
     query_embeddings, query_files = extract_embeddings_from_folder("testing_images8_animals/test/query", model)
     gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images8_animals/test/gallery", model)
 
-    submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- MODIFICARE DA QUA IL K
+    submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- MODIFICARE DA QUA IL K
     data = {
         os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
-        for entry in submission
+        for entry in submission_list
     }
+
+
+    # submission(data, "Pretty Figure")
+
     submission_path = "submission/submission_efficient_ft_t8.py"
     save_submission_d(data, submission_path)
 
