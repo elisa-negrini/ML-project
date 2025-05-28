@@ -10,7 +10,7 @@ import faiss
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print(device)
 # Carica modello e processor pre-addestrato
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -20,13 +20,29 @@ def extract_features(image_paths):
     embs = []
     for path in tqdm(image_paths, desc="Extracting features"):
         image = Image.open(path).convert("RGB")
+
+        ## elimina questo
         inputs = clip_processor(images=image, return_tensors="pt").to(device)
+        ## 
+
+        ## aggiungi questo
+
+        # # Se è in modalità "P" con trasparenza, converti in RGBA
+        # if image.mode == "P":
+        #     image = image.convert("RGBA")
+
+        # # Converti sempre in RGB alla fine (CLIP vuole RGB)
+        # image = image.convert("RGB")
+
+        # inputs = clip_processor(images=image, return_tensors="pt").to(device)
+
+        ## 
         with torch.no_grad():
             emb = clip_model.get_image_features(**inputs)
         embs.append(emb.cpu().numpy()[0])
     return np.array(embs).astype("float32")
 
-def retrieve(query_embs, gallery_embs, query_files, gallery_files, k=5):
+def retrieve(query_embs, query_files, gallery_embs, gallery_files, k=5):
     nn = NearestNeighbors(n_neighbors=k, metric="cosine")
 
     # matric = "cosine", "euclidean", "manhattan"
@@ -62,10 +78,17 @@ def retrieve(query_embs, gallery_embs, query_files, gallery_files, k=5):
 #         })
 #     return results
 
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
 
 # Percorsi cartelle immagini
-query_folder = "testing_images6_clothes/test/query"
-gallery_folder = "testing_images6_clothes/test/gallery"
+query_folder = "testing_images4/test/query"
+gallery_folder = "testing_images4/test/gallery"
 
 # Lista file immagini
 query_files = [os.path.join(query_folder, f) for f in os.listdir(query_folder) if f.endswith(".jpg")]
@@ -76,12 +99,17 @@ query_embs = extract_features(query_files)
 gallery_embs = extract_features(gallery_files)
 
 # Recupero immagini simili
-submission = retrieve(query_embs, gallery_embs, query_files, gallery_files, k=49)
+# Recupero immagini simili
+submission_list = retrieve(query_embs, query_files, gallery_embs, gallery_files, k=10) # <- CAMBIARE QUESTO K
+data = {
+    os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+    for entry in submission_list
+}
 
-# Salva risultati
-output_path = "submission/submission_clip_t6.json"
-os.makedirs(os.path.dirname(output_path), exist_ok=True)
-with open(output_path, "w") as f:
-    json.dump(submission, f, indent=2)
+# print(data)
+# submission(data, "Pretty Figure")
 
-print(f"✅ Submission salvata in: {output_path}")
+submission_path = "submission/submission_clip_t4_new.py"
+save_submission_d(data, submission_path)
+
+print(f"✅ Submission salvata in: {submission_path}")

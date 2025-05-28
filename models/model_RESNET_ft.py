@@ -10,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 transform = transforms.Compose([
     transforms.Resize(256),
@@ -48,7 +49,7 @@ def get_feature_extractor(trained_model):
     feature_extractor.eval()
     return feature_extractor.to(device)
 
-def retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=5):
+def retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10):
     model = NearestNeighbors(n_neighbors=k, metric='cosine')
     model.fit(gallery_embs)
     distances, indices = model.kneighbors(query_embs)
@@ -68,6 +69,15 @@ def save_submission(results, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
+
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
+
 
 
 def extract_embeddings_from_folder(folder_path, model):
@@ -90,22 +100,34 @@ def extract_embeddings_from_folder(folder_path, model):
     return torch.cat(all_embeddings, dim=0).numpy(), filenames
 
 # Step 1: Fine-tune il modello sul training set
-train_dataset = datasets.ImageFolder("testing_images5/training", transform=transform)
+train_dataset = datasets.ImageFolder("testing_images8_animals/training", transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 model = get_model(num_classes=len(train_dataset.classes))
 model = train_model(model, train_loader, epochs=5)
 
 # Step 2: Estrai features da query e gallery
 feature_extractor = get_feature_extractor(model)
-query_embeddings, query_files = extract_embeddings_from_folder("testing_images5/test/query", feature_extractor)
-gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images5/test/gallery", feature_extractor)
+query_embeddings, query_files = extract_embeddings_from_folder("testing_images8_animals/test/query", feature_extractor)
+gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images8_animals/test/gallery", feature_extractor)
 
 # Step 3: Retrieval
-submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=50) # <- CAMBIARE QUESTO K 
+submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIARE QUESTO K 
+
+data = {
+    os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+    for entry in submission_list
+}
+
+# submission(data, "Pretty Figure")
 
 # Step 4: Salvataggio nella repo
-submission_path = "submission/submission_resnet50_ft_t5.json"
+submission_path = "submission/submission_resnet50_ft_t5.py"
 
-save_submission(submission, submission_path)
+save_submission_d(data, submission_path)
+
+
+# if you want json
+# submission_path = "submission/submission_resnet50_ft_t5.json"
+# save_submission(submission, submission_path)
 print(f"✅ Submission salvata in: {submission_path}")
 

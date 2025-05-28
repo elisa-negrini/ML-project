@@ -12,6 +12,7 @@ from tqdm import tqdm
 from torch.utils.data._utils.collate import default_collate
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
 
 # Carica DINOv2 e il suo Image Processor
 MODEL_NAME = "facebook/dinov2-base"
@@ -188,6 +189,15 @@ def save_submission(results, output_path):
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
 
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
+
+
 # ===============================
 # ESECUZIONE COMPLETA
 # ===============================
@@ -223,7 +233,7 @@ model_to_train = ImageClassifierFineTuner(dino_model, embed_dim=embed_dim, num_c
 print("Inizio fine-tuning del modello...")
 # Passiamo image_processor alla funzione train_model per processare i batch di immagini PIL
 # Aumentato numero di epoche, LR potrebbe necessitare di tuning per DINOv2
-trained_fine_tuned_model = train_model(model_to_train, train_loader, image_processor_func=image_processor, epochs=10, lr=1e-5) # LR ridotto per DINOv2
+trained_fine_tuned_model = train_model(model_to_train, train_loader, image_processor_func=image_processor, epochs=5, lr=1e-5) # LR ridotto per DINOv2
 
 # Step 3: Estrai features da query e gallery usando il modello fine-tuned
 # Passiamo il modello fine-tuned completo e l'image_processor
@@ -260,10 +270,24 @@ gallery_embs = feature_extractor_fn(gallery_files)
 
 # Step 4: Retrieval
 if query_embs.shape[0] > 0 and gallery_embs.shape[0] > 0:
-    submission = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=50)   # <--- MODIFICARE QUESTO K
+    submission_list = retrieve_query_vs_gallery(query_embs, query_files, gallery_embs, gallery_files, k=10)   # <--- MODIFICARE QUESTO K
     # Step 5: Salvataggio
-    submission_path = "submission/submission_dino_ft_t5.json" # Nome file modificato
-    save_submission(submission, submission_path)
+
+    # if you want dict
+    data = {
+        os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+        for entry in submission_list
+        }
+    
+   
+    #submission(data, "Pretty Figure")
+
+    submission_path = "submission/submission_dino_ft_t5.py" # Nome file modificato
+    save_submission_d(data, submission_path)
+
+    # if you want json
+    # submission_path = "submission/submission_dino_ft_t5.json"
+    # save_submission(submission, submission_path)
     print(f"✅ Submission salvata in: {submission_path}")
 else:
     print("Nessuna embedding estratta, impossibile eseguire il retrieval o salvare la submission.")

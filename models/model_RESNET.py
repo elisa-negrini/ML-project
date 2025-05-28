@@ -10,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
 transform = transforms.Compose([
     transforms.Resize(256),
@@ -65,16 +66,35 @@ def save_submission(results, output_path):
     with open(output_path, "w") as f:
         json.dump(results, f, indent=2)
 
+def save_submission_d(results, output_path):
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with open(output_path, "w") as f:
+        f.write("data = {\n")
+        for key, value in results.items():
+            f.write(f'    "{key}": {value},\n')
+        f.write("}\n")
 
 # ---- MAIN FLOW ----
 
 feature_extractor = get_feature_extractor()
 
-query_embeddings, query_files = extract_embeddings_from_folder("testing_images7_fish/test/query", feature_extractor)
-gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images7_fish/test/gallery", feature_extractor)
+query_embeddings, query_files = extract_embeddings_from_folder("testing_images6_clothes/test/query", feature_extractor)
+gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images6_clothes/test/gallery", feature_extractor)
 
-submission = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=50) # <- CAMBIA QUESTO K
+submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIA QUESTO K
 
-submission_path = "submission/submission_resnet50_t7.json"
-save_submission(submission, submission_path)
+data = {
+    os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
+    for entry in submission_list
+}
+
+# submission(data, "Pretty Figure")
+
+submission_path = "submission/submission_resnet50_t6.py"
+save_submission_d(data, submission_path)
+
+
+# if you want json
+# submission_path = "submission/submission_resnet50_t7.json"
+# save_submission(submission, submission_path)
 print(f"✅ Submission salvata in: {submission_path}")
