@@ -14,10 +14,18 @@ from sklearn.cluster import DBSCAN
 from collections import defaultdict
 import cv2
 
+# Set the device to GPU if available, otherwise CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# --- MTCNN per Face Detection ---
+# --- MTCNN for Face Detection ---
+# Initialize MTCNN for face detection and alignment.
+# image_size: output image size (160x160 for FaceNet).
+# margin: adds margin to the detected face region.
+# min_face_size: minimum size of a face to be detected.
+# thresholds: detection thresholds for the three MTCNN stages.
+# factor: scale factor for image pyramid.
+# post_process: applies post-processing (e.g., facial landmark alignment).
 mtcnn = MTCNN(
     image_size=160, 
     margin=0, 
@@ -29,11 +37,13 @@ mtcnn = MTCNN(
 )
 
 # --- FaceNet Model Loading ---
+# Load the InceptionResnetV1 model pre-trained on VGGFace2 dataset.
+# Set to evaluation mode and move to the selected device.
 try:
     model = InceptionResnetV1(pretrained='vggface2').eval().to(device)
     print("FaceNet model loaded successfully")
 except Exception as e:
-    print(f"Errore nel caricamento del modello FaceNet: {e}")
+    print(f"Error loading FaceNet model: {e}")
     exit()
 
 def detect_and_crop_face(image_path, mtcnn_detector):
@@ -41,7 +51,7 @@ def detect_and_crop_face(image_path, mtcnn_detector):
     try:
         img = Image.open(image_path).convert('RGB')
         
-        # Detect face
+        # Detect face and get cropped image
         img_cropped = mtcnn_detector(img)
         
         if img_cropped is not None:
@@ -59,7 +69,7 @@ def augment_image(img_tensor):
     """Apply data augmentation to face image"""
     augmentations = []
     
-    # Original
+    # Original image
     augmentations.append(img_tensor)
     
     # Horizontal flip
@@ -75,12 +85,16 @@ def augment_image(img_tensor):
     
     return augmentations
 
-def get_feature_extractor_improved(base_model, use_mtcnn=True, use_augmentation=False):
+def get_feature_extractor_improved(base_model, use_mtcnn=True, use_augmentation=True):
+    """
+    Returns a feature extractor function that uses the base model,
+    with optional MTCNN face detection and data augmentation.
+    """
     def extractor(image_paths, is_training=False):
         embs = []
         processed_paths = []
         
-        for path in tqdm(image_paths, desc="Estrazione feature (FaceNet Enhanced)"):
+        for path in tqdm(image_paths, desc="Extracting features (FaceNet Enhanced)"):
             try:
                 if use_mtcnn:
                     img_tensor = detect_and_crop_face(path, mtcnn)
@@ -115,7 +129,7 @@ def get_feature_extractor_improved(base_model, use_mtcnn=True, use_augmentation=
                 processed_paths.append(path)
                 
             except Exception as e:
-                print(f"Errore con {path}: {e}")
+                print(f"Error with {path}: {e}")
                 continue
                 
         return np.array(embs).astype("float32") if embs else np.array([]).astype("float32"), processed_paths
@@ -123,7 +137,7 @@ def get_feature_extractor_improved(base_model, use_mtcnn=True, use_augmentation=
     return extractor
 
 def build_training_embeddings(train_folder, feature_extractor_fn):
-    """Build embeddings for training data organized by identity"""
+    """Builds embeddings for training data organized by identity"""
     identity_embeddings = {}
     identity_paths = {}
     
@@ -150,9 +164,11 @@ def build_training_embeddings(train_folder, feature_extractor_fn):
 
 def enhanced_retrieval_with_training(query_embs, query_files, gallery_embs, gallery_files, 
                                    identity_embeddings, k=10, use_reranking=True):
-    """Enhanced retrieval using training data knowledge"""
+    """Performs enhanced image retrieval using FAISS for similarity search
+    and optionally re-ranks results using knowledge from training identities.
+    """
     if query_embs.shape[0] == 0 or gallery_embs.shape[0] == 0:
-        print("Embedding vuoti. Retrieval non eseguibile.")
+        print("Empty embeddings. Retrieval cannot be performed.")
         return []
 
     # Normalizzazione L2
@@ -246,28 +262,28 @@ def submit(results, groupname, url=" http://tatooine.disi.unitn.it:3001/retrieva
         print(f"ERROR: {response.text}")
         return None
 
-# === CONFIGURAZIONE PATHS ===
+# === PATH CONFIGURATION ===
 train_folder = "train"
 query_folder = "test/query"
 gallery_folder = "test/gallery"
 
-# === CARICAMENTO FILE ===
+# === FILE LOADING ===
 try:
     query_files = [os.path.join(query_folder, f) for f in os.listdir(query_folder) 
                    if f.lower().endswith((".jpg", ".jpeg", ".png"))]
     gallery_files = [os.path.join(gallery_folder, f) for f in os.listdir(gallery_folder) 
                      if f.lower().endswith((".jpg", ".jpeg", ".png"))]
 except Exception as e:
-    print(f"Errore nel caricamento immagini: {e}")
+    print(f"Error loading images: {e}")
     exit()
 
 if not query_files or not gallery_files:
-    print("Query o gallery vuote.")
+    print("Query or gallery is empty. Exiting.")
     exit()
 
-print(f"Trovate {len(query_files)} query e {len(gallery_files)} gallery.")
+print(f"Found {len(query_files)} queries and {len(gallery_files)} gallery images.")
 
-# === ESTRAZIONE FEATURE CON MIGLIORAMENTI ===
+# === FEATURE EXTRACTION WITH ENHANCEMENTS ===
 feature_extractor_fn = get_feature_extractor_improved(model, use_mtcnn=True, use_augmentation=True)
 
 # Build training embeddings
@@ -282,7 +298,7 @@ query_embs, processed_query_files = feature_extractor_fn(query_files, is_trainin
 print("Extracting gallery embeddings...")
 gallery_embs, processed_gallery_files = feature_extractor_fn(gallery_files, is_training=False)
 
-# === RETRIEVAL E SALVATAGGIO ===
+# === RETRIEVAL AND SAVING ===
 if query_embs.shape[0] > 0 and gallery_embs.shape[0] > 0:
     print("Performing enhanced retrieval...")
     submission_list = enhanced_retrieval_with_training(
@@ -296,14 +312,13 @@ if query_embs.shape[0] > 0 and gallery_embs.shape[0] > 0:
         for entry in submission_list
     }
     
-    submission_path = "submission/submission_facenet2_enhanced.py"
+    submission_path = "submission/submission_facenet.py"
     save_submission_d(data, submission_path)
-    
     
     accuracy = submit(data, "Pretty Figure")
     
-    print(f"✅ Submission salvata in: {submission_path}")
-    if accuracy:
-        print(f"🎯 Accuracy ottenuta: {accuracy}")
+    print(f"✅ Submission saved to: {submission_path}")
+    if accuracy is not None:
+        print(f"🎯 Achieved accuracy: {accuracy}")
 else:
-    print("Embedding non estratti. Retrieval saltato.")
+    print("Embeddings not extracted. Retrieval skipped.")
