@@ -1,24 +1,79 @@
-# ML-project
+# Cross-Domain Image Retrieval Project
 
-Group members: Elisa Negrini, Michele Lovato Menin, Tommaso Ballarini
+This repository contains the models and associated code for our cross-domain image retrieval project, focused on matching real photographs with AI-generated images.
 
-DUBBI 
+---
 
-- quante immagini ci danno per il mini training là?
-- score di similarità conta solo se becchiamo tutte le anatre, o se becchiamo anche l’anatra più simile
-- ci danno il fine tuning per le immagini del test?
-- quanto grande la gallery
+## Introduction
 
-Per Zio Pietro
-- Fine-tuning, non ha senso?
-- Ha senso usare i top modelli e poi fare fine tuning sul nostro dominio o è ci sono altre strategie?
-- Usare git-hub, come non creare conflitti
-- Perchè usare la azure machine? o basta colab?
+This project stemmed from a competition focused on cross-domain image retrieval, specifically matching real photographs of celebrities (queries) with synthetic AI-generated images (gallery) of the same individuals rendered in different visual styles. The challenge required developing robust feature extraction and similarity matching techniques to bridge the domain gap between natural and synthetic imagery.
 
-Possibili problematiche:
-La funzione get_feature_extractor processa le immagini una alla volta. Questo può essere lento per gallery e query di grandi dimensioni.
-Suggerimento: Modifica get_feature_extractor per processare le immagini in batch.
-se abbiamo una gallery gigantesca ci mettiamo tabto a estrarre l'embedding per le immagini se le estraiamo una ad una
+The dataset consisted of approximately 5,000 training images organized by celebrity identity, with each subfolder containing both natural and synthetic images of the same person. The test set included around 1,500 query images (real photographs) and 1,500 gallery images (AI-generated synthetic images). For each query image, the task was to retrieve the 10 most similar gallery images, ranked by similarity.
+
+The evaluation was based on three metrics contributing to a maximum score of 1,000 points: **Top-1 Accuracy** (600 points) which checks the correctness of the most similar retrieved image, **Top-5 Accuracy** (300 points) requiring at least one correct match within the top 5 results, and **Top-10 Accuracy** (100 points) requiring at least one correct match within the top 10 results.
+
+### Overview of Approaches
+
+Our methodology involved experimenting with three distinct deep learning architectures, each leveraging different aspects of visual feature extraction. Prior to the actual competition, we conducted preliminary experiments on three different datasets to validate our approaches: `images_clothes` focusing on the clothing domain with approximately 10,000 test images, `images_fish` on fish species with around 13,000 test images, and `images_animals` on the animal domain comprising roughly 4,000 training images, 800 query images, and 800 gallery images. These preliminary tests served as proof-of-concept evaluations before applying our methods to the celebrity face dataset.
+
+#### ResNet-50 with Fine-tuning
+
+We began with a **ResNet-50** architecture pre-trained on ImageNet, applying fine-tuning on the training dataset. The model was modified with a custom classification head to learn identity-specific features. This approach utilized standard preprocessing techniques including resizing, center cropping, and normalization during both training and inference. The model was developed and tested before the competition as part of our initial exploration of traditional computer vision approaches.
+
+#### CLIP with Advanced Training Strategies
+
+The second approach employed **CLIP (ViT-L-14)** with sophisticated training enhancements, also developed prior to the competition. We created a custom architecture combining **GeM (Generalized Mean) Pooling** for more effective aggregation of patch features from the Vision Transformer, **ArcFace Loss** to learn more discriminative embeddings with angular margin constraints, **Center Loss** to increase intra-class compactness of learned representations, and **Mixup Augmentation** to improve generalization across the real-to-synthetic domain gap. This model required fine-tuning on the available training data, using advanced optimization techniques including mixed precision training and cosine annealing scheduling.
+
+#### FaceNet with Face-Specific Preprocessing
+
+Recognizing that the competition domain specifically involved facial images, we implemented **FaceNet (InceptionResnetV1)** pre-trained on VGGFace2 on the day of the competition. This approach was specifically designed after understanding the face-centric nature of the dataset. The implementation included **MTCNN Face Detection** for precise face localization and cropping, **multi-scale data augmentation** incorporating rotation, brightness adjustment, and horizontal flipping, and **identity-aware retrieval** leveraging training data to improve ranking through identity similarity bonuses. Importantly, while ResNet-50 and CLIP models required fine-tuning on the training data, FaceNet leveraged its pre-existing face-specific knowledge without additional fine-tuning, relying instead on enhanced data augmentation and specialized retrieval strategies.
+
+---
+
+## Repository Structure
+
+This repository is organized as follows:
+
+* **`models/`**: This folder contains the trained machine learning models used in the project.
+* **`submission/`**: Here you'll find the files related to the final competition submissions.
+* **`images_competition/`**: Contains the images used for the main competition.
+* **`images_fish/`**: Contains images from a dataset on fish species.
+* Other folders (e.g., `images_clothing`, `images_animals`) containing data from preliminary tests are structured similarly, providing a complete reference to the different test domains.
+
+---
+
+## Summary of Results
+
+On the final celebrity face dataset, our approaches achieved the following performance scores:
+
+| Setting                             | Score (out of 1000) |
+| :---------------------------------- | :------------------ |
+| ResNet-50                           | 75                  |
+| CLIP with advanced training         | 880                 |
+| FaceNet with face-specific processing | 970                 |
+| Ensemble (FaceNet + CLIP)           | 980                 |
+
+The superior performance of **FaceNet** demonstrated the importance of domain-specific pre-training for face recognition tasks. The combination of FaceNet and CLIP in our final ensemble approach achieved near-optimal performance, highlighting the complementary strengths of face-specific and general visual understanding models. The significant improvement from ResNet-50 to the specialized models underscores the critical importance of choosing appropriate architectures for domain-specific retrieval tasks.
+
+---
+
+## Contact
+
+For any questions or clarifications, please feel free to reach out.
+
+**Author:** Elisa Negrini (elisa.negrini@studenti.unitn.it), Michele Lovato Menin (michele.lovato-1@studenti.unitn.it), Tommaso Ballarini (tommaso.ballarini-1@studenti.unitn.it)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 RESULTS:
@@ -74,8 +129,5 @@ RESULTS:
 - modello_dino.py             ----- t1 ---- 97.75% -- k = 50
 - model_resnet50.py           ----- t1 ---- 84.58% -- k = 30
 - model_clip_vit_base_..ipynb ----- t1 ---- 82.14% -- k = 49
-
-
-
 
 MMM= modello minestrone mean
