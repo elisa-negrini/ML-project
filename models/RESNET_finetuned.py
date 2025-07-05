@@ -78,8 +78,6 @@ def save_submission_d(results, output_path):
             f.write(f'    "{key}": {value},\n')
         f.write("}\n")
 
-
-
 def extract_embeddings_from_folder(folder_path, model):
     image_paths = sorted([os.path.join(folder_path, fname)
                           for fname in os.listdir(folder_path)
@@ -99,35 +97,28 @@ def extract_embeddings_from_folder(folder_path, model):
 
     return torch.cat(all_embeddings, dim=0).numpy(), filenames
 
-# Step 1: Fine-tune il modello sul training set
-train_dataset = datasets.ImageFolder("train", transform=transform)
+# Step 1
+train_dataset = datasets.ImageFolder("images_competition/train", transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 model = get_model(num_classes=len(train_dataset.classes))
 model = train_model(model, train_loader, epochs=5)
 
-# Step 2: Estrai features da query e gallery
+# Step 2
 feature_extractor = get_feature_extractor(model)
-query_embeddings, query_files = extract_embeddings_from_folder("test/query", feature_extractor)
-gallery_embeddings, gallery_files = extract_embeddings_from_folder("test/gallery", feature_extractor)
+query_embeddings, query_files = extract_embeddings_from_folder("images_competition/test/query", feature_extractor)
+gallery_embeddings, gallery_files = extract_embeddings_from_folder("images_competition/test/gallery", feature_extractor)
 
 # Step 3: Retrieval
-submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIARE QUESTO K 
+submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10)
 
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
     for entry in submission_list
 }
 
-# submission(data, "Pretty Figure")
-
-# Step 4: Salvataggio nella repo
+# Step 4
 submission_path = "submission/submission_resnet50_ft.py"
 
 save_submission_d(data, submission_path)
 
-
-# if you want json
-# submission_path = "submission/submission_resnet50_ft_t5.json"
-# save_submission(submission, submission_path)
 print(f"✅ Submission salvata in: {submission_path}")
-

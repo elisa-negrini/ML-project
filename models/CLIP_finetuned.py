@@ -16,7 +16,6 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 import random
 import math
 
-# ==== CONFIGURAZIONE IPERPARAMETRI ====
 EMBED_DIM = 1024
 NUM_EPOCHS = 20
 BATCH_SIZE = 32
@@ -31,9 +30,9 @@ SEED = 42
 script_dir = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(script_dir, "..")
 
-TRAIN_DIR = os.path.join(BASE_DIR, "train")
-GALLERY_DIR = os.path.join(BASE_DIR, "test", "gallery")
-QUERY_DIR = os.path.join(BASE_DIR, "test", "query")
+TRAIN_DIR = os.path.join(BASE_DIR, "images_competition/train")
+GALLERY_DIR = os.path.join(BASE_DIR, "images_competition/test", "gallery")
+QUERY_DIR = os.path.join(BASE_DIR, "images_competition/test", "query")
 
 MODEL_SAVE_PATH = os.path.join(script_dir, "clip_finetuned_ablation.pt")
 SUBMISSION_PATH = os.path.join(script_dir, "submission_finetuned_ablation.py")

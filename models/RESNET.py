@@ -22,7 +22,6 @@ transform = transforms.Compose([
 
 def get_feature_extractor():
     model = models.resnet50(pretrained=True)
-    # togli l'ultimo layer fc per avere feature 2048-d
     feature_extractor = nn.Sequential(*list(model.children())[:-1])
     feature_extractor.eval()
     return feature_extractor.to(device)
@@ -78,23 +77,17 @@ def save_submission_d(results, output_path):
 
 feature_extractor = get_feature_extractor()
 
-query_embeddings, query_files = extract_embeddings_from_folder("testing_images6_clothes/test/query", feature_extractor)
-gallery_embeddings, gallery_files = extract_embeddings_from_folder("testing_images6_clothes/test/gallery", feature_extractor)
+query_embeddings, query_files = extract_embeddings_from_folder("images_competition/test/query", feature_extractor)
+gallery_embeddings, gallery_files = extract_embeddings_from_folder("images_competition/test/gallery", feature_extractor)
 
-submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10) # <- CAMBIA QUESTO K
+submission_list = retrieve_query_vs_gallery(query_embeddings, query_files, gallery_embeddings, gallery_files, k=10)
 
 data = {
     os.path.basename(entry['filename']): [os.path.basename(img) for img in entry['gallery_images']]
     for entry in submission_list
 }
 
-# submission(data, "Pretty Figure")
-
 submission_path = "submission/submission_resnet50_t6.py"
 save_submission_d(data, submission_path)
 
-
-# if you want json
-# submission_path = "submission/submission_resnet50_t7.json"
-# save_submission(submission, submission_path)
 print(f"✅ Submission salvata in: {submission_path}")

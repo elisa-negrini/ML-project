@@ -29,8 +29,7 @@ if device.type == "cuda":
     torch.cuda.manual_seed_all(SEED)
 
 # ========== PATHS AND COMPETITION CONFIGURATION ==========
-# ## AGGIORNATO ##: Aggiunta costante per il nome del gruppo
-GROUP_NAME = "Pretty Figure" # <-- CAMBIA QUESTO!
+GROUP_NAME = "Pretty Figure"
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(script_dir, "..")
@@ -42,10 +41,9 @@ QUERY_DIR = os.path.join(BASE_DIR, "test", "query")
 CLIP_MODEL_PATH = os.path.join(script_dir, "clip_arcface_no_gem_trained.pt")
 
 # ========== ENSEMBLE CONFIGURATION ==========
-# ## AGGIORNATO ##: Pesi ricalcolati in base agli score forniti (FaceNet=970, CLIP=920)
 TOTAL_SCORE = 970 + 920
-FACENET_WEIGHT = 0.7   # Risultato: ~0.513
-CLIP_WEIGHT = 0.3    # Risultato: ~0.487
+FACENET_WEIGHT = 0.7
+CLIP_WEIGHT = 0.3
 
 # Confidence thresholds
 MIN_CONFIDENCE_THRESHOLD = 0.1  # Minimum confidence to consider a prediction
@@ -289,14 +287,13 @@ class OptimizedCLIPFaceNetEnsemble:
         
         return results
 
-# ## AGGIORNATO ##: Funzione di salvataggio modificata per includere il nome del gruppo
 def save_submission_d(group_name, submission_dict, output_path):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
         f.write(f'groupname = "{group_name}"\n')
         f.write("retrieval = {\n")
         for key, value in submission_dict.items():
-            # Assicura che i nomi dei file nella lista siano tra virgolette
+            
             formatted_values = [f'"{os.path.basename(v)}"' for v in value]
             f.write(f'    "{key}": [{", ".join(formatted_values)}],\n')
         f.write("}\n")
@@ -315,7 +312,6 @@ def main():
     print("📥 Loading CLIP+ArcFace model...")
     clip_base, _, clip_preprocess = open_clip.create_model_and_transforms("ViT-L-14", pretrained="openai")
     
-    # ## NOTA ##: Parametri confermati dall'utente (embed_dim=1024, unfreeze_layers=4)
     clip_model = CLIPArcFaceNoGeM(
         clip_base, embed_dim=1024, num_classes=None, unfreeze_layers=4
     ).to(device)
@@ -351,7 +347,6 @@ def main():
         k=10, use_identity_reranking=True
     )
     
-    # ## AGGIORNATO ##: Logica finale semplificata per salvare solo il file .d
     if submission_list:
         submission_dict = {
             os.path.basename(entry['filename']): entry['gallery_images']

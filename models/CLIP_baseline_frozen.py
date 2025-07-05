@@ -15,18 +15,11 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 import random
 
-# ==== CONFIGURAZIONE IPERPARAMETRI ====
 EMBED_DIM = 1024
-NUM_EPOCHS = 20
+NUM_EPOCHS = 15
 BATCH_SIZE = 32
 LR_BASE = 1e-4
-LR_BACKBONE = 1e-5
 
-# -- Parametri ArcFace --
-ARCFACE_SCALE = 64.0
-ARCFACE_MARGIN = 0.5
-
-UNFREEZE_LAYERS = 4
 TOP_K = 10
 SEED = 42
 
@@ -34,12 +27,13 @@ SEED = 42
 script_dir = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(script_dir, "..")
 
-TRAIN_DIR = os.path.join(BASE_DIR, "train")
-GALLERY_DIR = os.path.join(BASE_DIR, "test", "gallery")
-QUERY_DIR = os.path.join(BASE_DIR, "test", "query")
+TRAIN_DIR = os.path.join(BASE_DIR, "images_competition/train")
+GALLERY_DIR = os.path.join(BASE_DIR, "images_competition/test", "gallery")
+QUERY_DIR = os.path.join(BASE_DIR, "images_competition/test", "query")
 
-MODEL_SAVE_PATH = os.path.join(script_dir, "clip_arcface_no_gem_trained.pt")
-SUBMISSION_PATH = os.path.join(script_dir, "submission_arcface_no_gem2.py")
+MODEL_SAVE_PATH = os.path.join(script_dir, "clip_baseline_frozen.pt")
+SUBMISSION_PATH = os.path.join(script_dir, "submission_baseline_frozen.py")
+LOGS_PATH = os.path.join(script_dir, "logs_baseline_frozen.json")
 
 # ==== DEVICE & SEED ====
 torch.manual_seed(SEED)
@@ -50,37 +44,15 @@ if device.type == "cuda":
     torch.cuda.manual_seed_all(SEED)
 print(f"[INFO] Using device: {device}")
 
-# ==== ARCHITETTURA: CLIP + ArcFace (SENZA GeM Pooling) ====
-
-class CLIPArcFaceNoGeM(nn.Module):
-    """
-    Architettura: CLIP + ArcFace SENZA GeM Pooling
-    - Usa il pooling standard di CLIP (class token)
-    - Proiezione finale con normalizzazione per ArcFace
-    - Questo script serve per verificare se GeM pooling è davvero necessario
-    """
-    def __init__(self, clip_model, embed_dim=1024, num_classes=None, unfreeze_layers=4):
+class CLIPBaseline(nn.Module):
+    def __init__(self, clip_model, embed_dim=1024, num_classes=None):
         super().__init__()
         self.clip = clip_model
         
-        # Freeze/unfreeze strategia identica agli altri script
-        total_layers = len(clip_model.visual.transformer.resblocks)
-        print(f"[INFO] Total transformer layers: {total_layers}, unfreezing last {unfreeze_layers}")
+        for param in clip_model.parameters():
+            param.requires_grad = False
         
-        for name, param in clip_model.visual.named_parameters():
-            if 'resblocks' in name:
-                try:
-                    layer_idx = int(name.split('.')[2])
-                    param.requires_grad = layer_idx >= total_layers - unfreeze_layers
-                except:
-                    param.requires_grad = False
-            else:
-                param.requires_grad = False
-        
-        # NOTA: NON usiamo GeM pooling qui - usiamo il pooling standard di CLIP
-        
-        # Projection head
-        clip_dim = 768  # Dimensione standard per ViT-L-14
+        clip_dim = 768
         self.projection = nn.Sequential(
             nn.Linear(clip_dim, embed_dim),
             nn.BatchNorm1d(embed_dim),
@@ -88,21 +60,14 @@ class CLIPArcFaceNoGeM(nn.Module):
             nn.Dropout(0.1)
         )
         
-        # ArcFace classifier (senza bias)
         if num_classes:
-            self.classifier = nn.Linear(embed_dim, num_classes, bias=False)
+            self.classifier = nn.Linear(embed_dim, num_classes)
     
     def forward(self, x):
-        # Usa il forward standard di CLIP per ottenere features (con class token pooling)
-        clip_features = self.clip.visual(x)  # [B, clip_dim]
+        with torch.no_grad():
+            features = self.clip.encode_image(x)
         
-        # Debug dimensioni
-        if not hasattr(self, '_debug_printed'):
-            print(f"[DEBUG] CLIP features shape: {clip_features.shape}")
-            self._debug_printed = True
-        
-        # Proiezione e normalizzazione per ArcFace
-        embeddings = F.normalize(self.projection(clip_features), dim=-1)
+        embeddings = self.projection(features.float())
         
         if hasattr(self, 'classifier'):
             logits = self.classifier(embeddings)
@@ -110,43 +75,12 @@ class CLIPArcFaceNoGeM(nn.Module):
         return embeddings
     
     def extract_features(self, x):
-        """Metodo per estrazione features durante inference"""
         with torch.no_grad():
-            clip_feat = self.clip.visual(x)
-            emb = F.normalize(self.projection(clip_feat), dim=-1)
-        return emb
+            clip_features = self.clip.encode_image(x)
+            embeddings = self.projection(clip_features.float())
+            return F.normalize(embeddings, dim=-1)
 
-# ==== ARCFACE LOSS ====
-
-class ArcFaceLoss(nn.Module):
-    def __init__(self, scale=64.0, margin=0.5):
-        super(ArcFaceLoss, self).__init__()
-        self.scale = scale
-        self.margin = margin
-        self.ce_loss = nn.CrossEntropyLoss()
-
-    def forward(self, embeddings, labels, classifier_weights):
-        # Normalizza i pesi del classificatore
-        normalized_weights = F.normalize(classifier_weights)
-        
-        # Calcola cosine similarity
-        cosine_sim = F.linear(embeddings, normalized_weights)
-        
-        # Crea one-hot encoding per le label corrette
-        one_hot = torch.zeros_like(cosine_sim)
-        one_hot.scatter_(1, labels.view(-1, 1).long(), 1)
-        
-        # Calcola angolo e aggiungi margine
-        angle = torch.acos(torch.clamp(cosine_sim, -1.0 + 1e-7, 1.0 - 1e-7))
-        angle.add_(self.margin * one_hot)
-        margin_cosine = torch.cos(angle)
-        
-        # Scala e calcola loss
-        final_logits = margin_cosine * self.scale
-        
-        return self.ce_loss(final_logits, labels)
-
-# ==== DATASET (identico agli altri script) ====
+# ==== DATASET ====
 class ImprovedIdentityDataset(Dataset):
     def __init__(self, root_dir, preprocess_fn, is_training=True):
         self.samples = []
@@ -222,25 +156,15 @@ class FlatTestDataset(Dataset):
             print(f"[ERROR] Loading {img_path}: {e}")
             return torch.zeros(3, 224, 224), img_path
 
-# ==== TRAINING CON ArcFace (SENZA GeM) ====
-
-def train_arcface_no_gem(model, train_loader):
-    """
-    Training con solo ArcFace, senza GeM pooling.
-    Questo serve per testare l'importanza del GeM pooling.
-    """
-    print("[INFO] Starting training with ArcFace (NO GeM pooling)...")
+# ==== TRAINING BASELINE ====
+def train_baseline(model, train_loader):
+    print("[INFO] Starting baseline training (frozen backbone)...")
     
-    # Loss function
-    arcface_loss_fn = ArcFaceLoss(scale=ARCFACE_SCALE, margin=ARCFACE_MARGIN).to(device)
-    
-    # Optimizer
-    optimizer = torch.optim.AdamW([
-        {'params': [p for n, p in model.clip.visual.named_parameters() if p.requires_grad], 
-         'lr': LR_BACKBONE, 'weight_decay': 1e-4},
-        {'params': list(model.projection.parameters()) + list(model.classifier.parameters()), 
-         'lr': LR_BASE, 'weight_decay': 1e-4}
-    ])
+    criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.AdamW(
+        [p for p in model.parameters() if p.requires_grad], 
+        lr=LR_BASE, weight_decay=1e-4
+    )
     
     scheduler = CosineAnnealingWarmRestarts(
         optimizer, T_0=len(train_loader) * (NUM_EPOCHS // 3), T_mult=1
@@ -249,10 +173,12 @@ def train_arcface_no_gem(model, train_loader):
     scaler = GradScaler()
     
     model.train()
+    epoch_logs = []
     
     for epoch in range(1, NUM_EPOCHS + 1):
         total_loss = 0
-        
+        correct = 0
+        total = 0
         progress_bar = tqdm(train_loader, desc=f'Epoch {epoch}/{NUM_EPOCHS}')
         
         for images, labels in progress_bar:
@@ -261,33 +187,41 @@ def train_arcface_no_gem(model, train_loader):
             optimizer.zero_grad()
             
             with autocast():
-                embeddings, _ = model(images)
-                
-                # Solo ArcFace loss
-                arcface_loss = arcface_loss_fn(embeddings, labels, model.classifier.weight)
-                
-                total_batch_loss = arcface_loss
+                embeddings, logits = model(images)
+                loss = criterion(logits, labels)
             
-            scaler.scale(total_batch_loss).backward()
+            scaler.scale(loss).backward()
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             scaler.step(optimizer)
             scaler.update()
             scheduler.step()
             
-            total_loss += total_batch_loss.item()
+            total_loss += loss.item()
+            _, predicted = torch.max(logits.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
             
             progress_bar.set_postfix({
-                'ArcFace Loss': f'{arcface_loss.item():.4f}'
+                'Loss': f'{loss.item():.4f}',
+                'Acc': f'{100*correct/total:.2f}%'
             })
         
         avg_loss = total_loss / len(train_loader)
+        train_acc = 100 * correct / total
         
-        print(f'Epoch {epoch}: ArcFace Loss = {avg_loss:.4f}')
+        epoch_logs.append({
+            'epoch': epoch,
+            'loss': avg_loss,
+            'train_acc': train_acc
+        })
         
+        print(f'Epoch {epoch}: Loss = {avg_loss:.4f}, Train Acc = {train_acc:.2f}%')
+    
+    with open(LOGS_PATH, 'w') as f:
+        json.dump(epoch_logs, f, indent=2)
+    
     print("[INFO] Training completed!")
-
-# ==== UTILITY FUNCTIONS ====
 
 def extract_embeddings(model, data_loader):
     model.eval()
@@ -325,7 +259,7 @@ def cosine_retrieval(query_embeddings, gallery_embeddings, query_files, gallery_
 
 # ==== MAIN PIPELINE ====
 def main():
-    print("[INFO] === ABLATION STUDY: CLIP + ArcFace (SENZA GeM) ===")
+    print("[INFO] === ABLATION STUDY: CLIP BASELINE (FROZEN) ===")
     print("[INFO] Loading ViT-L-14 model...")
     clip_model, _, preprocess = open_clip.create_model_and_transforms(
         "ViT-L-14", pretrained="openai"
@@ -359,24 +293,21 @@ def main():
         print(e)
         return
 
-    # Inizializza modello
     num_classes = len(train_dataset.label_map)
-    model = CLIPArcFaceNoGeM(
-        clip_model, embed_dim=EMBED_DIM, num_classes=num_classes, unfreeze_layers=UNFREEZE_LAYERS
+    model = CLIPBaseline(
+        clip_model, embed_dim=EMBED_DIM, num_classes=num_classes
     ).to(device)
     
     print(f"[INFO] Training with {num_classes} classes, embed_dim={EMBED_DIM}")
-    print(f"[INFO] ArcFace: scale={ARCFACE_SCALE}, margin={ARCFACE_MARGIN}")
-    print(f"[INFO] NO GeM pooling - using standard CLIP class token pooling")
+    print(f"[INFO] Backbone frozen: {not any(p.requires_grad for p in model.clip.parameters())}")
+    print(f"[INFO] Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)}")
     
     # Training
-    train_arcface_no_gem(model, train_loader)
+    train_baseline(model, train_loader)
     
-    # Salva modello
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
     print(f"[INFO] Model saved to {MODEL_SAVE_PATH}")
     
-    # Estrai embeddings
     print("[INFO] Extracting embeddings...")
     query_embeddings, query_files = extract_embeddings(model, query_loader)
     gallery_embeddings, gallery_files = extract_embeddings(model, gallery_loader)
@@ -387,10 +318,9 @@ def main():
         query_embeddings, gallery_embeddings, query_files, gallery_files, k=TOP_K
     )
     
-    # Salva submission
     save_submission_dict(results, SUBMISSION_PATH)
     print(f"[INFO] Submission dictionary saved to {SUBMISSION_PATH}")
-    print("[INFO] === CLIP + ArcFace (NO GeM) experiment completed! ===")
+    print(f"[INFO] Training logs saved to {LOGS_PATH}")
 
 if __name__ == "__main__":
     main()
