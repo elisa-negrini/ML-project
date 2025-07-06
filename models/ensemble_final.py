@@ -29,7 +29,7 @@ if device.type == "cuda":
     torch.cuda.manual_seed_all(SEED)
 
 # ========== PATHS AND COMPETITION CONFIGURATION ==========
-GROUP_NAME = "Pretty Figure"
+# GROUP_NAME rimosso
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.join(script_dir, "..")
@@ -41,8 +41,9 @@ QUERY_DIR = os.path.join(BASE_DIR, "test", "query")
 CLIP_MODEL_PATH = os.path.join(script_dir, "clip_arcface_trained.pt")
 
 # ========== ENSEMBLE CONFIGURATION ==========
-FACENET_WEIGHT = 0.8
-CLIP_WEIGHT = 0.2
+TOTAL_SCORE = 970 + 910
+FACENET_WEIGHT = 970/ TOTAL_SCORE
+CLIP_WEIGHT = 910/ TOTAL_SCORE
 
 # Confidence thresholds
 MIN_CONFIDENCE_THRESHOLD = 0.1  # Minimum confidence to consider a prediction
@@ -231,11 +232,11 @@ class SimpleCLIPFaceNetEnsemble:
         
         return results
 
-def save_submission_d(group_name, submission_dict, output_path):
+def save_submission_d(submission_dict, output_path): # GROUP_NAME rimosso dalla firma
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
-        f.write(f'groupname = "{group_name}"\n')
-        f.write("retrieval = {\n")
+        # f.write(f'groupname = "{group_name}"\n') # riga rimossa
+        f.write("data = {\n") # Modificato retrieval in data
         for key, value in submission_dict.items():
             
             formatted_values = [f'"{os.path.basename(v)}"' for v in value]
@@ -294,12 +295,12 @@ def main():
             for entry in submission_list
         }
         
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = os.path.join(BASE_DIR, f"submission_{GROUP_NAME}_{timestamp}.d")
+        # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") # timestamp non più necessario per il nome file fisso
+        output_filename = os.path.join(BASE_DIR, "submission_ensemble_final.py") # Nome file fisso
         
         print(f"💾 Saving submission to: {output_filename}")
         try:
-            save_submission_d(GROUP_NAME, submission_dict, output_filename)
+            save_submission_d(submission_dict, output_filename) # Rimosso GROUP_NAME
             print("   - File saved successfully.")
             print(f"   - Ora puoi caricare manualmente il file '{output_filename}' sulla piattaforma della competizione.")
         except Exception as e:
