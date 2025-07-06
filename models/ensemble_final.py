@@ -38,12 +38,11 @@ GALLERY_DIR = os.path.join(BASE_DIR, "test", "gallery")
 QUERY_DIR = os.path.join(BASE_DIR, "test", "query")
 
 # Model weights path
-CLIP_MODEL_PATH = os.path.join(script_dir, "clip_arcface_no_gem_trained.pt")
+CLIP_MODEL_PATH = os.path.join(script_dir, "clip_arcface_trained.pt")
 
 # ========== ENSEMBLE CONFIGURATION ==========
-TOTAL_SCORE = 970 + 910
-FACENET_WEIGHT = 970/ TOTAL_SCORE
-CLIP_WEIGHT = 910/ TOTAL_SCORE
+FACENET_WEIGHT = 0.8
+CLIP_WEIGHT = 0.2
 
 # Confidence thresholds
 MIN_CONFIDENCE_THRESHOLD = 0.1  # Minimum confidence to consider a prediction
@@ -54,7 +53,7 @@ print(f"   - CLIP+ArcFace Weight: {CLIP_WEIGHT:.3f}")
 print(f"   - Confidence Threshold: {MIN_CONFIDENCE_THRESHOLD}")
 
 # ========== CLIP+ARCFACE MODEL ==========
-class CLIPArcFaceNoGeM(nn.Module):
+class CLIPArcFace(nn.Module):
     def __init__(self, clip_model, embed_dim=1024, num_classes=None, unfreeze_layers=4):
         super().__init__()
         self.clip = clip_model
@@ -180,7 +179,7 @@ class SimpleCLIPFaceNetEnsemble:
         return np.array(embs, dtype="float32"), processed_paths, failed_paths
 
     def simple_ensemble_retrieval(self, query_embs_fn, query_embs_clip, query_files, 
-                                 gallery_embs_fn, gallery_embs_clip, gallery_files, k=10):
+                                  gallery_embs_fn, gallery_embs_clip, gallery_files, k=10):
         print("🚀 Starting simple ensemble retrieval...")
         
         # Normalize embeddings
@@ -257,7 +256,7 @@ def main():
     print("📥 Loading CLIP+ArcFace model...")
     clip_base, _, clip_preprocess = open_clip.create_model_and_transforms("ViT-L-14", pretrained="openai")
     
-    clip_model = CLIPArcFaceNoGeM(
+    clip_model = CLIPArcFace(
         clip_base, embed_dim=1024, num_classes=None, unfreeze_layers=4
     ).to(device)
     clip_model.load_state_dict(torch.load(CLIP_MODEL_PATH, map_location=device), strict=False)    
@@ -305,11 +304,10 @@ def main():
             print(f"   - Ora puoi caricare manualmente il file '{output_filename}' sulla piattaforma della competizione.")
         except Exception as e:
              print(f"❌ Error saving submission file: {e}")
-        else:
-            print("❌ Submission list is empty. No output file generated.")
-            print("=" * 60)
-            print("🏁 Ensemble execution finished.")
+    else:
+        print("❌ Submission list is empty. No output file generated.")
+    print("=" * 60)
+    print("🏁 Ensemble execution finished.")
 
 if __name__ == '__main__':
     main()
-        
