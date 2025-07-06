@@ -136,36 +136,8 @@ def get_feature_extractor_improved(base_model, use_mtcnn=True, use_augmentation=
     
     return extractor
 
-def build_training_embeddings(train_folder, feature_extractor_fn):
-    """Builds embeddings for training data organized by identity"""
-    identity_embeddings = {}
-    identity_paths = {}
-    
-    for identity_folder in tqdm(os.listdir(train_folder), desc="Processing training identities"):
-        identity_path = os.path.join(train_folder, identity_folder)
-        if not os.path.isdir(identity_path):
-            continue
-            
-        image_files = [
-            os.path.join(identity_path, f) 
-            for f in os.listdir(identity_path) 
-            if f.lower().endswith((".jpg", ".jpeg", ".png"))
-        ]
-        
-        if image_files:
-            embs, processed_paths = feature_extractor_fn(image_files, is_training=True)
-            if len(embs) > 0:
-                # Average embeddings for this identity
-                avg_embedding = np.mean(embs, axis=0)
-                identity_embeddings[identity_folder] = avg_embedding
-                identity_paths[identity_folder] = processed_paths
-    
-    return identity_embeddings, identity_paths
-
-def enhanced_retrieval_with_training(query_embs, query_files, gallery_embs, gallery_files, 
-                                   identity_embeddings, k=10, use_reranking=True):
+def enhanced_retrieval(query_embs, query_files, gallery_embs, gallery_files, k=10):
     """Performs enhanced image retrieval using FAISS for similarity search
-    and optionally re-ranks results using knowledge from training identities.
     """
     if query_embs.shape[0] == 0 or gallery_embs.shape[0] == 0:
         print("Empty embeddings. Retrieval cannot be performed.")
@@ -174,22 +146,11 @@ def enhanced_retrieval_with_training(query_embs, query_files, gallery_embs, gall
     # Normalizzazione L2
     faiss.normalize_L2(gallery_embs)
     faiss.normalize_L2(query_embs)
-    
-    # Build identity embeddings matrix
-    if identity_embeddings:
-        identity_names = list(identity_embeddings.keys())
-        identity_embs = np.array([identity_embeddings[name] for name in identity_names]).astype("float32")
-        faiss.normalize_L2(identity_embs)
-    
+
     # Standard gallery search
     dim = gallery_embs.shape[1]
     gallery_index = faiss.IndexFlatIP(dim)
     gallery_index.add(gallery_embs)
-    
-    # Identity search if available
-    if identity_embeddings:
-        identity_index = faiss.IndexFlatIP(dim)
-        identity_index.add(identity_embs)
     
     results = []
     
@@ -197,38 +158,9 @@ def enhanced_retrieval_with_training(query_embs, query_files, gallery_embs, gall
         query_emb = query_embs[i:i+1]
         
         # Search in gallery
-        gallery_distances, gallery_indices = gallery_index.search(query_emb, min(k*2, gallery_embs.shape[0]))
-        
-        # Search in identity embeddings for additional context
-        if identity_embeddings and use_reranking:
-            identity_distances, identity_indices = identity_index.search(query_emb, min(5, len(identity_names)))
-            
-            # Get top matching identities
-            top_identities = [identity_names[idx] for idx in identity_indices[0]]
-            
-            # Re-rank gallery results based on identity similarity
-            gallery_matches = []
-            for idx in gallery_indices[0]:
-                gallery_path = gallery_files[idx]
-                gallery_filename = os.path.basename(gallery_path)
-                
-                # Check if gallery image belongs to a top-matching identity
-                identity_bonus = 0
-                for j, identity in enumerate(top_identities):
-                    if identity.lower() in gallery_filename.lower():
-                        identity_bonus = 0.1 * (1 - j/len(top_identities))  # Bonus decreases with rank
-                        break
-                
-                original_score = gallery_distances[0][len(gallery_matches)]
-                adjusted_score = original_score + identity_bonus
-                
-                gallery_matches.append((gallery_path, adjusted_score))
-            
-            # Sort by adjusted score
-            gallery_matches.sort(key=lambda x: x[1], reverse=True)
-            final_matches = [match[0] for match in gallery_matches[:k]]
-        else:
-            final_matches = [gallery_files[idx] for idx in gallery_indices[0][:k]]
+        gallery_distances, gallery_indices = gallery_index.search(query_emb, min(k, gallery_embs.shape[0]))
+
+        final_matches = [gallery_files[idx] for idx in gallery_indices[0][:k]]
         
         query_rel = query_path.replace("\\", "/")
         final_matches_rel = [match.replace("\\", "/") for match in final_matches]
@@ -263,9 +195,8 @@ def submit(results, groupname, url=" http://tatooine.disi.unitn.it:3001/retrieva
         return None
 
 # === PATH CONFIGURATION ===
-train_folder = "train"
-query_folder = "test/query"
-gallery_folder = "test/gallery"
+query_folder = "images_competition/test/query"
+gallery_folder = "images_competition/test/gallery"
 
 # === FILE LOADING ===
 try:
@@ -286,11 +217,6 @@ print(f"Found {len(query_files)} queries and {len(gallery_files)} gallery images
 # === FEATURE EXTRACTION WITH ENHANCEMENTS ===
 feature_extractor_fn = get_feature_extractor_improved(model, use_mtcnn=True, use_augmentation=False)
 
-# Build training embeddings
-print("Building training embeddings...")
-identity_embeddings, identity_paths = build_training_embeddings(train_folder, feature_extractor_fn)
-print(f"Created embeddings for {len(identity_embeddings)} identities")
-
 # Extract query and gallery embeddings
 print("Extracting query embeddings...")
 query_embs, processed_query_files = feature_extractor_fn(query_files, is_training=False)
@@ -301,10 +227,10 @@ gallery_embs, processed_gallery_files = feature_extractor_fn(gallery_files, is_t
 # === RETRIEVAL AND SAVING ===
 if query_embs.shape[0] > 0 and gallery_embs.shape[0] > 0:
     print("Performing enhanced retrieval...")
-    submission_list = enhanced_retrieval_with_training(
+    submission_list = enhanced_retrieval(
         query_embs, processed_query_files, 
         gallery_embs, processed_gallery_files, 
-        identity_embeddings, k=10, use_reranking=True
+        k=10
     )
     
     data = {
@@ -312,13 +238,13 @@ if query_embs.shape[0] > 0 and gallery_embs.shape[0] > 0:
         for entry in submission_list
     }
     
-    submission_path = "submission/submission_facenet.py"
+    submission_path = "submission/submission_facenet_abl_aug.py"
     save_submission_d(data, submission_path)
     
-    accuracy = submit(data, "Pretty Figure")
+    # accuracy = submit(data, "Pretty Figure")
     
-    print(f"✅ Submission saved to: {submission_path}")
-    if accuracy is not None:
-        print(f"🎯 Achieved accuracy: {accuracy}")
+    # print(f"✅ Submission saved to: {submission_path}")
+    # if accuracy is not None:
+    #     print(f"🎯 Achieved accuracy: {accuracy}")
 else:
     print("Embeddings not extracted. Retrieval skipped.")
